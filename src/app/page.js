@@ -6,6 +6,7 @@ import TemplateInstan from '../components/TemplateInstan';
 import AuthModal from '../components/AuthModal';
 import { supabase } from '../utils/supabase';
 
+export const dynamic = 'force-dynamic';
 export default function Home() {
   const [tampilkanPilihan, setTampilkanPilihan] = useState(false);
   const [halamanAktif, setHalamanAktif] = useState('beranda');
