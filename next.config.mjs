@@ -1,7 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Mengizinkan akses dari jaringan/device lokal Anda
-  allowedDevOrigins: ['10.5.0.2'],
+  // Matikan static generation untuk halaman yang butuh data
+  output: 'standalone', 
+  experimental: {
+    // Membantu mencegah build hang pada project yang kompleks
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
+  },
 };
 
 export default nextConfig;

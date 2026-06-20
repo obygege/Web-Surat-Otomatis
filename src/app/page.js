@@ -5,8 +5,20 @@ import SuratEditor from '../components/SuratEditor';
 import TemplateInstan from '../components/TemplateInstan';
 import AuthModal from '../components/AuthModal';
 import { supabase } from '../utils/supabase';
+// Tambahan Baru untuk deploy
+import { useEffect, useState } from 'react';
 
+// Tambahan Baru untuk deploy
+export default function Page() {
+  // Panggil data hanya di dalam useEffect agar tidak dijalankan saat Build
+  useEffect(() => {
+    // Logika fetch data Anda di sini
+  }, []);
+
+  return <div>Konten Anda</div>;
+}
 export const dynamic = 'force-dynamic';
+
 export default function Home() {
   const [tampilkanPilihan, setTampilkanPilihan] = useState(false);
   const [halamanAktif, setHalamanAktif] = useState('beranda');
