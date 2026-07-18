@@ -14,7 +14,7 @@ export default function SuratEditor({ setHalamanAktif }) {
     const [hasUsedFree, setHasUsedFree] = useState(false);
     const [isLoadingPayment, setIsLoadingPayment] = useState(false);
 
-    // State Notifikasi Pop-up (Pengganti Alert)
+    // State Notifikasi Pop-up
     const [notifPopup, setNotifPopup] = useState(null);
     const [showSuccessAnim, setShowSuccessAnim] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -23,9 +23,17 @@ export default function SuratEditor({ setHalamanAktif }) {
     const [templateAktif, setTemplateAktif] = useState(TEMPLATE_SURAT[0].id);
     const [dataForm, setDataForm] = useState({});
     const [isiSurat, setIsiSurat] = useState('');
-
-    // TAMBAHAN: State untuk melacak ID dokumen di Database agar bisa di-Update
     const [documentId, setDocumentId] = useState(null);
+
+    // State Loading PDF
+    const [isDownloading, setIsDownloading] = useState(false);
+
+    // Pengaturan Kertas, Font, dan Ukuran
+    const [pengaturan, setPengaturan] = useState({
+        kertas: 'a4',
+        fontFamily: '"Times New Roman", Times, serif',
+        fontSize: '12pt'
+    });
 
     // State Kop Surat & Tanda Tangan
     const [kopSurat, setKopSurat] = useState({
@@ -38,75 +46,181 @@ export default function SuratEditor({ setHalamanAktif }) {
     });
     const [tandaTangan, setTandaTangan] = useState(null);
 
-    // State & Ref untuk Tanda Tangan Langsung (Digital Signature)
-    const [sigMode, setSigMode] = useState('upload'); // 'upload' atau 'draw'
+    // State & Ref Tanda Tangan Langsung
+    const [sigMode, setSigMode] = useState('upload');
     const canvasRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
 
+    const editorRef = useRef(null);
+    const isInitialMount = useRef(true);
+
     // =================================================================
-    // SISTEM KEAMANAN (ROUTE GUARD)
+    // FUNGSI CEK & TAMBAH KUOTA PREMIUM (3x SEMINGGU) TANPA DB
+    // =================================================================
+    const checkPremiumLimit = () => {
+        const now = Date.now();
+        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+        let usageStart = localStorage.getItem('futura_premium_usage_start');
+        let usageCount = parseInt(localStorage.getItem('futura_premium_usage_count') || '0', 10);
+
+        if (usageStart && (now - parseInt(usageStart, 10) > oneWeek)) {
+            // Reset otomatis jika sudah lewat 1 minggu
+            localStorage.setItem('futura_premium_usage_start', now.toString());
+            localStorage.setItem('futura_premium_usage_count', '0');
+            return 0;
+        }
+        return usageCount;
+    };
+
+    const incrementPremiumLimit = () => {
+        const now = Date.now();
+        const oneWeek = 7 * 24 * 60 * 60 * 1000;
+        let usageStart = localStorage.getItem('futura_premium_usage_start');
+        let usageCount = parseInt(localStorage.getItem('futura_premium_usage_count') || '0', 10);
+
+        if (!usageStart || (now - parseInt(usageStart, 10) > oneWeek)) {
+            localStorage.setItem('futura_premium_usage_start', now.toString());
+            usageCount = 0;
+        }
+
+        const newCount = usageCount + 1;
+        localStorage.setItem('futura_premium_usage_count', newCount.toString());
+        return newCount;
+    };
+
+    // =================================================================
+    // LOAD DATA DARI LOCAL STORAGE SAAT REFRESH
     // =================================================================
     useEffect(() => {
+        const savedDraft = localStorage.getItem('surat_draft_futura');
+        if (savedDraft) {
+            try {
+                const parsed = JSON.parse(savedDraft);
+                if (parsed.step) setStep(parsed.step);
+                if (parsed.templateAktif) setTemplateAktif(parsed.templateAktif);
+                if (parsed.dataForm) setDataForm(parsed.dataForm);
+                if (parsed.isiSurat) setIsiSurat(parsed.isiSurat);
+                if (parsed.kopSurat) setKopSurat(parsed.kopSurat);
+                if (parsed.tandaTangan) setTandaTangan(parsed.tandaTangan);
+                if (parsed.documentId) setDocumentId(parsed.documentId);
+                if (parsed.sigMode) setSigMode(parsed.sigMode);
+                if (parsed.pengaturan) setPengaturan(parsed.pengaturan);
+            } catch (e) {
+                console.error("Gagal meload draft otomatis", e);
+            }
+        }
+    }, []);
+
+    // =================================================================
+    // AUTO-SAVE KE LOCAL STORAGE SAAT ADA PERUBAHAN
+    // =================================================================
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+        const draft = { step, templateAktif, dataForm, isiSurat, kopSurat, tandaTangan, documentId, sigMode, pengaturan };
+        localStorage.setItem('surat_draft_futura', JSON.stringify(draft));
+    }, [step, templateAktif, dataForm, isiSurat, kopSurat, tandaTangan, documentId, sigMode, pengaturan]);
+
+    useEffect(() => {
         const checkSecurityAndSession = async () => {
-            const { data } = await supabase.auth.getSession();
-            setUserAktif(data?.session?.user || null);
-
-            const freeUsed = localStorage.getItem('futura_free_used') === 'true';
-            const premium = localStorage.getItem('futura_premium') === 'true';
-
-            setHasUsedFree(freeUsed);
-            setIsPremium(premium);
-
-            // PROTEKSI HALAMAN: Jika jatah gratis habis dan bukan premium, MENTAL KE BERANDA!
-            if (freeUsed && !premium) {
-                setHalamanAktif('beranda');
+            // Ditambahkan Try-Catch agar tidak error jika Supabase delay/putus
+            try {
+                const { data } = await supabase.auth.getSession();
+                setUserAktif(data?.session?.user || null);
+            } catch (error) {
+                console.warn("Autentikasi diabaikan sementara (mode lokal)");
+            } finally {
+                const freeUsed = localStorage.getItem('futura_free_used') === 'true';
+                const premium = localStorage.getItem('futura_premium') === 'true';
+                setHasUsedFree(freeUsed);
+                setIsPremium(premium);
             }
         };
-
         checkSecurityAndSession();
     }, [setHalamanAktif]);
 
+    // PERBAIKAN: useEffect yang memaksa render `innerText` ke editorRef DIHAPUS.
+    // Hal ini yang menyebabkan kursor loncat atau fokus hilang saat mengetik 1 huruf.
+
     // =================================================================
-    // FUNGSI TANDA TANGAN LANGSUNG (CANVAS)
+    // LOGIKA "BUAT SURAT BARU"
     // =================================================================
-    const startDrawing = (e) => {
-        if (sigMode !== 'draw') return;
+    const handleBuatBaru = () => {
+        if (!isPremium && hasUsedFree) {
+            setNotifPopup({
+                title: "Akses Gratis Habis",
+                message: "Anda sudah menggunakan jatah 1x Generate AI gratis. Untuk membuat surat baru, silakan upgrade ke Mode Pro (Limit 3x/minggu).",
+                type: "warning",
+                isUpgrade: true
+            });
+            return;
+        }
+
+        if (isPremium) {
+            const usage = checkPremiumLimit();
+            if (usage >= 3) {
+                setNotifPopup({
+                    title: "Batas Mingguan Tercapai",
+                    message: "Batas 3x pembuatan surat AI untuk minggu ini sudah habis. Silakan coba lagi minggu depan.",
+                    type: "warning"
+                });
+                return;
+            }
+        }
+
+        localStorage.removeItem('surat_draft_futura');
+        setStep('form');
+        setDataForm({});
+        setIsiSurat('');
+        setKopSurat({ tampilkan: false, namaInstansi: '', alamatInstansi: '', kontakInstansi: '', logoKiri: null, logoKanan: null });
+        setTandaTangan(null);
+        setDocumentId(null);
+        setPengaturan({ kertas: 'a4', fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt' });
+    };
+
+    // =================================================================
+    // KANVAS TTD
+    // =================================================================
+    const getCoordinates = (e) => {
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
         const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    };
 
+    const startDrawing = (e) => {
+        if (sigMode !== 'draw') return;
+        const ctx = canvasRef.current.getContext('2d');
+        const { x, y } = getCoordinates(e);
         ctx.beginPath();
-        ctx.moveTo(clientX - rect.left, clientY - rect.top);
+        ctx.moveTo(x, y);
         setIsDrawing(true);
     };
 
     const draw = (e) => {
         if (!isDrawing || sigMode !== 'draw') return;
-        e.preventDefault(); // Mencegah scrolling layar saat menggambar di HP
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-        ctx.lineTo(clientX - rect.left, clientY - rect.top);
+        e.preventDefault();
+        const ctx = canvasRef.current.getContext('2d');
+        const { x, y } = getCoordinates(e);
+        ctx.lineTo(x, y);
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.lineCap = 'round';
         ctx.stroke();
     };
 
-    const stopDrawing = () => {
-        setIsDrawing(false);
-    };
+    const stopDrawing = () => setIsDrawing(false);
 
     const clearSignature = () => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        setTandaTangan(null); // Hapus preview TTD
+        setTandaTangan(null);
     };
 
     const saveSignature = () => {
@@ -117,9 +231,6 @@ export default function SuratEditor({ setHalamanAktif }) {
         }
     };
 
-    // =================================================================
-    // HANDLER INPUT & FILE
-    // =================================================================
     const handleFormChange = (e) => setDataForm({ ...dataForm, [e.target.name]: e.target.value });
     const handleKopChange = (e) => setKopSurat({ ...kopSurat, [e.target.name]: e.target.value });
 
@@ -136,37 +247,26 @@ export default function SuratEditor({ setHalamanAktif }) {
         }
     };
 
-    const bersihkanMarkdown = (teksRaw) => {
-        return teksRaw.replace(/[*#`]/g, '');
-    };
-
-    // FUNGSI AUTO-RESIZE TEXTAREA (Agar PDF Sama Persis dengan Preview)
-    const handleTextareaChange = (e) => {
-        setIsiSurat(e.target.value);
-        e.target.style.height = 'auto'; // Reset tinggi
-        e.target.style.height = `${e.target.scrollHeight}px`; // Set sesuai isi
-    };
-
-    // Trigger auto-resize saat surat pertama kali di-generate
-    useEffect(() => {
-        const tx = document.getElementById('isi-surat-textarea');
-        if (tx && isiSurat) {
-            tx.style.height = 'auto';
-            tx.style.height = `${tx.scrollHeight}px`;
-        }
-    }, [isiSurat, step]);
-
-    // =================================================================
-    // MESIN GENERATE AI (Perbaikan Prompt Cerdas)
-    // =================================================================
     const prosesGenerate = async () => {
         if (!isPremium && hasUsedFree) {
-            setHalamanAktif('beranda');
+            handleBuatBaru();
             return;
         }
 
+        if (isPremium) {
+            const usage = checkPremiumLimit();
+            if (usage >= 3) {
+                setNotifPopup({
+                    title: "Batas Mingguan Tercapai",
+                    message: "Anda sudah menggunakan 3/3 kuota pembuatan surat mingguan Anda. Harap tunggu minggu depan.",
+                    type: "warning"
+                });
+                return;
+            }
+        }
+
         setStep('loading-ai');
-        setDocumentId(null); // Reset ID Dokumen agar saat membuat draft baru terhitung sebagai Insert Baru
+        setDocumentId(null);
 
         try {
             const templateTerpilih = TEMPLATE_SURAT.find(t => t.id === templateAktif);
@@ -179,18 +279,15 @@ export default function SuratEditor({ setHalamanAktif }) {
                 }
             });
 
-            // PROMPT AI DIPERBAIKI: Larangan tegas membuat tanda tangan ganda
-            const promptAI = `Anda adalah sekretaris dan asisten pembuat surat profesional tingkat tinggi.
-Tugas Anda: Buatkan draft dokumen formal yang rapi, berstandar administrasi Indonesia, berjenis "${templateTerpilih?.nama}".
-
-Berikut adalah data spesifik yang diberikan oleh pengguna:
+            const promptAI = `Anda asisten pembuat surat. Buatkan draft dokumen formal berjenis "${templateTerpilih?.nama}".
+Data pengguna:
 ${dataContext}
 
-Instruksi Cerdas:
-1. Kembangkan alasan/inti surat secara KREATIF, LOGIS, dan PROFESIONAL agar surat tampak meyakinkan.
-2. Pastikan surat memiliki struktur: Pembuka, Isi, dan Penutup.
-3. SANGAT PENTING: JANGAN SEKALI-KALI menuliskan bagian tanda tangan di akhir surat (seperti "Hormat saya", "Mengetahui", nama terang, garis, dll). Sistem kami sudah mencetaknya secara otomatis di bawah!
-4. JANGAN GUNAKAN simbol markdown seperti **, *, atau #. Tulis dalam teks polos dengan enter/spasi yang rapi.`;
+ATURAN MUTLAK:
+1. JANGAN tulis Tempat & Tanggal pembuatan surat.
+2. JANGAN tulis penutup seperti "Hormat saya", nama, atau tanda tangan. Berhenti di kalimat penutup paragraf terakhir!
+3. Langsung mulai dengan "Yth..." atau "Dengan hormat,".
+4. Tanpa simbol markdown (*, #).`;
 
             const response = await fetch('/api/generate', {
                 method: 'POST',
@@ -201,80 +298,117 @@ Instruksi Cerdas:
             if (!response.ok) throw new Error("Gagal AI");
             const data = await response.json();
 
-            setIsiSurat(bersihkanMarkdown(data.text));
-            kunciAksesGratis();
+            let teksBersih = data.text.replace(/[*#`]/g, '');
+
+            const hapusTtd = teksBersih.search(/Hormat\s*(saya|kami)|Mengetahui|Pemohon/i);
+            if (hapusTtd !== -1) {
+                teksBersih = teksBersih.substring(0, hapusTtd);
+            }
+
+            const baris = teksBersih.split('\n');
+            if (/^[a-zA-Z\s]+,\s*\d{1,2}\s+[a-zA-Z]+\s+\d{4}/i.test(baris[0])) {
+                baris.shift();
+            }
+
+            // Ganti step terlebih dahulu agar render Editor terjadi
+            setIsiSurat(baris.join('\n').trim());
+            setStep('editor');
+
+            // Set Timeout dipastikan berjalan agar Notifikasi Pop-Up PASTI muncul di atas Editor
+            setTimeout(() => {
+                if (isPremium) {
+                    const newCount = incrementPremiumLimit();
+                    setNotifPopup({
+                        title: "Selesai Dibuat!",
+                        message: `Surat Anda berhasil digenerate oleh AI.\n\n Info Kuota Pro: Anda telah menggunakan ${newCount}/3 batas pembuatan surat minggu ini.`,
+                        type: "success"
+                    });
+                } else {
+                    localStorage.setItem('futura_free_used', 'true');
+                    setHasUsedFree(true);
+                    setNotifPopup({
+                        title: "Selesai Dibuat!",
+                        message: "Surat Anda berhasil digenerate oleh AI.\n\n Info Kuota: Anda telah menggunakan 1/1 akses gratis. Upgrade ke Pro untuk limit 3x per minggu.",
+                        type: "success"
+                    });
+                }
+            }, 500);
+
         } catch (err) {
-            setNotifPopup({ title: "Server Sibuk", message: "Koneksi ke AI terputus atau server sedang penuh. Silakan coba beberapa saat lagi.", type: "error" });
+            setNotifPopup({ title: "Server Sibuk", message: "Koneksi ke AI terputus. Silakan coba lagi.", type: "error" });
             setStep('form');
         }
     };
 
-    const kunciAksesGratis = () => {
-        setStep('editor');
-        if (!isPremium) {
-            localStorage.setItem('futura_free_used', 'true');
-            setHasUsedFree(true);
+    const syncTextBeforeProcess = () => {
+        const divIsi = document.getElementById('isi-surat-textarea');
+        if (divIsi) {
+            let currentText = divIsi.innerText;
+            currentText = currentText.replace(/^\s+|\s+$/g, '');
+            setIsiSurat(currentText);
+            return currentText;
         }
+        return isiSurat;
     };
 
-    // =================================================================
-    // FUNGSI SIMPAN KE DATABASE (SUPABASE)
-    // =================================================================
     const simpanDokumen = async () => {
-        if (!userAktif) {
-            setNotifPopup({ title: "Akses Ditolak", message: "Anda harus login untuk menyimpan dokumen ke akun.", type: "error" });
-            return;
-        }
-
+        if (!userAktif) return;
+        const teksTerbaru = syncTextBeforeProcess();
         const templateTerpilih = TEMPLATE_SURAT.find(t => t.id === templateAktif);
         const judulSurat = templateTerpilih ? templateTerpilih.nama : 'Dokumen AI Otomatis';
 
         try {
             if (documentId) {
-                // UPDATE data jika dokumen sudah pernah disimpan di sesi ini
-                const { error } = await supabase
-                    .from('documents')
-                    .update({
-                        judul_surat: judulSurat,
-                        isi_surat: isiSurat,
-                        tipe_kertas: 'A4'
-                    })
-                    .eq('id', documentId)
-                    .eq('user_id', userAktif.id); // Lapis keamanan ekstra memastikan milik user tersebut
-
-                if (error) throw error;
-                setNotifPopup({ title: "Diperbarui!", message: "Perubahan pada dokumen berhasil disimpan.", type: "success" });
+                await supabase.from('documents')
+                    .update({ judul_surat: judulSurat, isi_surat: teksTerbaru, tipe_kertas: pengaturan.kertas.toUpperCase() })
+                    .eq('id', documentId).eq('user_id', userAktif.id);
             } else {
-                // INSERT data baru jika dokumen belum pernah disimpan
-                const { data, error } = await supabase
-                    .from('documents')
-                    .insert([
-                        {
-                            user_id: userAktif.id,
-                            judul_surat: judulSurat,
-                            isi_surat: isiSurat,
-                            tipe_kertas: 'A4'
-                        }
-                    ])
+                const { data } = await supabase.from('documents')
+                    .insert([{ user_id: userAktif.id, judul_surat: judulSurat, isi_surat: teksTerbaru, tipe_kertas: pengaturan.kertas.toUpperCase() }])
                     .select();
-
-                if (error) throw error;
-                if (data && data.length > 0) {
-                    setDocumentId(data[0].id); // Set State dengan ID dari Supabase agar selanjutnya menjadi Update
-                }
-                setNotifPopup({ title: "Tersimpan!", message: "Dokumen berhasil disimpan ke database akun Anda.", type: "success" });
+                if (data && data.length > 0) setDocumentId(data[0].id);
             }
         } catch (error) {
-            console.error("Error saving doc:", error);
-            setNotifPopup({ title: "Gagal Simpan", message: "Terjadi kesalahan saat menyimpan dokumen ke server.", type: "error" });
+            console.error(error);
         }
     };
 
+    // =================================================================
+    // UNDUH PDF LANGSUNG
+    // =================================================================
+    const unduhPDF = async () => {
+        syncTextBeforeProcess();
+        setIsDownloading(true);
+        setNotifPopup({ title: "Mengunduh PDF...", message: "File sedang dibuat dan akan langsung terunduh otomatis ke perangkat Anda...", type: "warning" });
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const element = document.getElementById('pdf-blueprint');
+        const isF4 = pengaturan.kertas === 'f4';
+
+        const opt = {
+            margin: [30, 30, 30, 30],
+            filename: `Surat_${dataForm.nama || dataForm.nama1 || 'Futura'}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+            jsPDF: { unit: 'mm', format: isF4 ? [215.9, 330.2] : 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['css', 'legacy'], avoid: ['p', '.ttd-container'] }
+        };
+
+        window.html2pdf().set(opt).from(element).save().then(() => {
+            setIsDownloading(false);
+            setNotifPopup(null);
+            setShowSuccessAnim(true);
+            setTimeout(() => setShowSuccessAnim(false), 3500);
+        }).catch((err) => {
+            console.error("Gagal cetak:", err);
+            setIsDownloading(false);
+            setNotifPopup({ title: "Gagal Cetak", message: "Terjadi gangguan memori browser saat mengonversi file.", type: "error" });
+        });
+    };
+
     const handleBayarPremium = async () => {
-        if (!userAktif) {
-            setNotifPopup({ title: "Akses Ditolak", message: "Sesi login tidak ditemukan. Harap kembali ke beranda untuk login.", type: "error" });
-            return;
-        }
+        if (!userAktif) return setNotifPopup({ title: "Akses Ditolak", message: "Silakan login terlebih dahulu.", type: "error" });
 
         setIsLoadingPayment(true);
         try {
@@ -284,21 +418,21 @@ Instruksi Cerdas:
                 body: JSON.stringify({
                     order_id: `FUTURA-PRO-${Date.now()}`,
                     gross_amount: 10000,
-                    customer_details: { first_name: dataForm.nama || 'Pengguna', email: userAktif.email || 'user@example.com' }
+                    customer_details: { first_name: dataForm.nama || 'Pengguna', email: userAktif.email }
                 })
             });
             const data = await response.json();
 
             if (window.snap) {
                 window.snap.pay(data.token, {
-                    onSuccess: function (result) {
-                        setNotifPopup({ title: "Pembayaran Sukses!", message: "Selamat datang di Mode Pro. Silakan nikmati akses tanpa batas.", type: "success" });
+                    onSuccess: function () {
+                        setNotifPopup({ title: "Pembayaran Sukses!", message: "Selamat datang di Mode Pro. Nikmati kuota 3x pembuatan surat per minggu.", type: "success" });
                         localStorage.setItem('futura_premium', 'true');
                         setIsPremium(true);
-                        setShowPaymentModal(false);
+                        setHasUsedFree(false);
                     },
-                    onPending: function (result) { setNotifPopup({ title: "Menunggu", message: "Pembayaran sedang diproses...", type: "warning" }); },
-                    onError: function (result) { setNotifPopup({ title: "Gagal", message: "Transaksi gagal diproses.", type: "error" }); },
+                    onPending: function () { setNotifPopup({ title: "Menunggu", message: "Pembayaran diproses...", type: "warning" }); },
+                    onError: function () { setNotifPopup({ title: "Gagal", message: "Transaksi gagal.", type: "error" }); },
                     onClose: function () { setNotifPopup({ title: "Dibatalkan", message: "Anda menutup jendela pembayaran.", type: "warning" }); }
                 });
             }
@@ -309,29 +443,14 @@ Instruksi Cerdas:
         }
     };
 
-    const unduhPDF = () => {
-        const element = document.getElementById('kertas-surat');
-        const opt = {
-            margin: [15, 15, 15, 15],
-            filename: `Surat_${dataForm.nama || dataForm.nama1 || 'AI_Otomatis'}.pdf`,
-            image: { type: 'jpeg', quality: 1 },
-            pagebreak: { mode: 'avoid-all' },
-            html2canvas: { scale: 3, useCORS: true, scrollY: 0 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
-
-        window.html2pdf().set(opt).from(element).save().then(() => {
-            setShowSuccessAnim(true);
-            setTimeout(() => setShowSuccessAnim(false), 3500);
-        });
-    };
-
     const formAktif = TEMPLATE_SURAT.find(t => t.id === templateAktif)?.fields || [];
 
-    return (
-        <div className="py-12 px-4 md:px-6 bg-slate-100 min-h-screen relative font-normal text-slate-800">
+    const paperWidth = pengaturan.kertas === 'f4' ? '215.9mm' : '210mm';
+    const paperHeight = pengaturan.kertas === 'f4' ? '330.2mm' : '297mm';
 
-            {/* POP-UP NOTIFIKASI UMUM */}
+    return (
+        <div className="py-12 px-4 md:px-6 bg-slate-100 min-h-screen relative font-normal text-slate-800 overflow-hidden">
+
             {notifPopup && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4">
                     <div className="bg-white p-8 rounded-xl max-w-sm w-full text-center shadow-2xl animate-scale-in">
@@ -341,13 +460,22 @@ Instruksi Cerdas:
                             {notifPopup.type === 'warning' && <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>}
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">{notifPopup.title}</h3>
-                        <p className="text-gray-600 mb-6 text-sm leading-relaxed">{notifPopup.message}</p>
-                        <button onClick={() => setNotifPopup(null)} className="w-full bg-slate-900 text-white py-3 rounded-md hover:bg-slate-800 transition">Mengerti</button>
+                        <p className="text-gray-600 mb-6 text-sm leading-relaxed whitespace-pre-wrap">{notifPopup.message}</p>
+
+                        {notifPopup.isUpgrade ? (
+                            <div className="flex gap-3">
+                                <button onClick={() => setNotifPopup(null)} className="w-1/2 bg-slate-200 text-slate-800 py-3 rounded-md hover:bg-slate-300 transition font-medium">Batal</button>
+                                <button onClick={() => { setNotifPopup(null); handleBayarPremium(); }} className="w-1/2 bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition font-bold">Upgrade Pro</button>
+                            </div>
+                        ) : (
+                            notifPopup.type !== 'warning' && (
+                                <button onClick={() => setNotifPopup(null)} className="w-full bg-slate-900 text-white py-3 rounded-md hover:bg-slate-800 transition">Mengerti</button>
+                            )
+                        )}
                     </div>
                 </div>
             )}
 
-            {/* ANIMASI SUKSES UNDUH */}
             {showSuccessAnim && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
                     <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center animate-scale-in transform transition-all">
@@ -361,17 +489,21 @@ Instruksi Cerdas:
             )}
 
             <div className="max-w-5xl mx-auto">
-                <button onClick={() => setHalamanAktif('beranda')} className="mb-6 text-blue-600 hover:text-blue-800 flex items-center gap-2 font-medium">
-                    <span>←</span> Kembali ke Beranda
-                </button>
+                <div className="flex justify-between items-center mb-6">
+                    <button onClick={() => setHalamanAktif('beranda')} className="text-blue-600 hover:text-blue-800 flex items-center gap-2 font-medium transition">
+                        <span>←</span> Kembali ke Beranda
+                    </button>
 
-                {/* ========================================== */}
-                {/* STEP 1: FORM INPUT */}
-                {/* ========================================== */}
+                    <button onClick={handleBuatBaru} className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-50 hover:border-red-300 transition shadow-sm text-sm flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                        Buat Surat Baru
+                    </button>
+                </div>
+
                 {step === 'form' && (
                     <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
                         <h2 className="text-3xl font-bold text-slate-900 mb-8 pb-4 border-b border-slate-100 flex items-center gap-3">
-                            Super Editor AI <span className="text-yellow-400">⚡</span>
+                            Super Editor AI
                         </h2>
 
                         <div className="space-y-10">
@@ -380,32 +512,32 @@ Instruksi Cerdas:
                                 <select value={templateAktif} onChange={(e) => {
                                     setTemplateAktif(e.target.value);
                                     setDataForm({});
-                                }} className="px-4 py-3 border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50">
+                                }} className="px-4 py-3 border border-slate-300 rounded-md focus:border-blue-500 outline-none bg-slate-50">
                                     {TEMPLATE_SURAT.map(t => <option key={t.id} value={t.id}>{t.nama}</option>)}
                                 </select>
                             </div>
 
                             <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
                                 <label className="flex items-center gap-3 cursor-pointer mb-4">
-                                    <input type="checkbox" checked={kopSurat.tampilkan} onChange={(e) => setKopSurat({ ...kopSurat, tampilkan: e.target.checked })} className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
+                                    <input type="checkbox" checked={kopSurat.tampilkan} onChange={(e) => setKopSurat({ ...kopSurat, tampilkan: e.target.checked })} className="w-5 h-5 text-blue-600 rounded border-gray-300" />
                                     <span className="font-bold text-slate-700">Gunakan Kop Surat Resmi</span>
                                 </label>
 
                                 {kopSurat.tampilkan && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 animate-slide-up">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                                         <div className="space-y-4">
-                                            <input type="text" name="namaInstansi" placeholder="Nama Instansi/Perusahaan" onChange={handleKopChange} className="w-full px-4 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-blue-400" />
-                                            <input type="text" name="alamatInstansi" placeholder="Alamat Lengkap Instansi" onChange={handleKopChange} className="w-full px-4 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-blue-400" />
-                                            <input type="text" name="kontakInstansi" placeholder="Telepon / Email / Website" onChange={handleKopChange} className="w-full px-4 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-blue-400" />
+                                            <input type="text" name="namaInstansi" placeholder="Nama Instansi/Perusahaan" value={kopSurat.namaInstansi || ''} onChange={handleKopChange} className="w-full px-4 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-blue-400" />
+                                            <input type="text" name="alamatInstansi" placeholder="Alamat Lengkap Instansi" value={kopSurat.alamatInstansi || ''} onChange={handleKopChange} className="w-full px-4 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-blue-400" />
+                                            <input type="text" name="kontakInstansi" placeholder="Telepon / Email / Website" value={kopSurat.kontakInstansi || ''} onChange={handleKopChange} className="w-full px-4 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-blue-400" />
                                         </div>
                                         <div className="space-y-4">
                                             <div>
                                                 <label className="text-xs font-medium text-slate-500 block mb-1">Logo Kiri (Opsional)</label>
-                                                <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logoKiri')} className="text-sm w-full file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+                                                <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logoKiri')} className="text-sm w-full file:bg-blue-50 file:text-blue-700 cursor-pointer border border-slate-200 p-1.5 rounded-lg" />
                                             </div>
                                             <div>
                                                 <label className="text-xs font-medium text-slate-500 block mb-1">Logo Kanan (Opsional)</label>
-                                                <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logoKanan')} className="text-sm w-full file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+                                                <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'logoKanan')} className="text-sm w-full file:bg-blue-50 file:text-blue-700 cursor-pointer border border-slate-200 p-1.5 rounded-lg" />
                                             </div>
                                         </div>
                                     </div>
@@ -421,9 +553,9 @@ Instruksi Cerdas:
                                             <div key={field.name} className={`flex flex-col ${isTextarea ? 'md:col-span-2' : ''}`}>
                                                 <label className="text-sm text-slate-600 mb-2 font-medium">{field.label}</label>
                                                 {isTextarea ? (
-                                                    <textarea name={field.name} onChange={handleFormChange} placeholder={field.placeholder} rows="4" className="px-4 py-3 border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition" />
+                                                    <textarea name={field.name} value={dataForm[field.name] || ''} onChange={handleFormChange} placeholder={field.placeholder} rows="4" className="px-4 py-3 border border-slate-300 rounded-md outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
                                                 ) : (
-                                                    <input type="text" name={field.name} onChange={handleFormChange} placeholder={field.placeholder} className="px-4 py-3 border border-slate-300 rounded-md focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition" />
+                                                    <input type="text" name={field.name} value={dataForm[field.name] || ''} onChange={handleFormChange} placeholder={field.placeholder} className="px-4 py-3 border border-slate-300 rounded-md outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
                                                 )}
                                             </div>
                                         )
@@ -431,50 +563,44 @@ Instruksi Cerdas:
                                 </div>
                             </div>
 
-                            {/* FITUR TANDA TANGAN (UPLOAD / GAMBAR) */}
                             <div className="pt-4 border-t border-slate-100">
                                 <h3 className="text-sm font-bold text-slate-700 mb-4 border-b pb-2">3. Tanda Tangan (Opsional)</h3>
-
                                 <div className="flex gap-3 mb-4">
-                                    <button onClick={() => setSigMode('upload')} className={`px-4 py-2 text-sm font-medium rounded-md transition ${sigMode === 'upload' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>Upload Gambar</button>
-                                    <button onClick={() => setSigMode('draw')} className={`px-4 py-2 text-sm font-medium rounded-md transition ${sigMode === 'draw' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>Gambar Langsung</button>
+                                    <button onClick={() => setSigMode('upload')} className={`px-4 py-2 text-sm font-medium rounded-lg transition ${sigMode === 'upload' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>Upload Gambar</button>
+                                    <button onClick={() => setSigMode('draw')} className={`px-4 py-2 text-sm font-medium rounded-lg transition ${sigMode === 'draw' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}>Gambar Langsung</button>
                                 </div>
 
                                 {sigMode === 'upload' ? (
-                                    <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'ttd')} className="text-sm w-full md:w-1/2 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer" />
+                                    <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'ttd')} className="text-sm w-full md:w-1/2 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 cursor-pointer border border-slate-200 p-2 rounded-lg" />
                                 ) : (
-                                    <div className="w-full md:w-1/2">
+                                    <div className="w-full md:w-1/2 flex flex-col bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
                                         <canvas
                                             ref={canvasRef}
-                                            width={300}
-                                            height={150}
-                                            className="w-full bg-white border-2 border-dashed border-slate-300 rounded-md cursor-crosshair touch-none"
+                                            width={400}
+                                            height={200}
+                                            className="w-full max-w-sm h-[150px] bg-white border-2 border-dashed border-blue-300 rounded-xl cursor-crosshair touch-none shadow-sm transition hover:border-blue-500 mx-auto"
                                             onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
                                             onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing}
                                         />
-                                        <div className="flex justify-between mt-3">
-                                            <button onClick={clearSignature} className="text-sm text-red-500 hover:text-red-700 font-medium">Hapus</button>
-                                            <button onClick={saveSignature} className="text-sm bg-slate-800 text-white px-4 py-1.5 rounded hover:bg-slate-900 transition">Simpan TTD</button>
+                                        <div className="flex justify-between w-full max-w-sm mx-auto mt-4 items-center">
+                                            <button onClick={clearSignature} className="text-sm text-red-600 hover:text-red-800 font-bold px-4 py-2 bg-red-100 hover:bg-red-200 rounded-lg transition">Hapus TTD</button>
+                                            <button onClick={saveSignature} className="text-sm bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition shadow-md font-bold">Simpan TTD</button>
                                         </div>
                                     </div>
                                 )}
                             </div>
-
                         </div>
 
                         <div className="mt-12 flex justify-end">
-                            <button onClick={prosesGenerate} className="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:shadow-xl hover:shadow-blue-500/30 transition transform hover:-translate-y-1">
+                            <button onClick={prosesGenerate} className="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-xl shadow-lg hover:shadow-blue-500/40 transition transform hover:-translate-y-1">
                                 Generate dengan AI
                             </button>
                         </div>
                     </div>
                 )}
 
-                {/* ========================================== */}
-                {/* STEP 2: LOADING */}
-                {/* ========================================== */}
                 {step === 'loading-ai' && (
-                    <div className="bg-white p-20 rounded-xl shadow-sm text-center flex flex-col items-center justify-center border border-slate-200 animate-scale-in">
+                    <div className="bg-white p-20 rounded-xl shadow-sm text-center flex flex-col items-center justify-center border border-slate-200">
                         <div className="relative w-20 h-20 mb-8">
                             <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
                             <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
@@ -484,40 +610,57 @@ Instruksi Cerdas:
                     </div>
                 )}
 
-                {/* ========================================== */}
-                {/* STEP 3: PREVIEW DOKUMEN & DOWNLOAD */}
-                {/* ========================================== */}
                 {step === 'editor' && (
-                    <div className="animate-slide-up">
+                    <div className="animate-slide-up relative">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap justify-between items-center gap-4 sticky top-24 z-30">
-                            <h3 className="text-xl font-bold text-slate-800">Review & Edit Dokumen <span className="text-blue-500">(Versi AI)</span></h3>
+                            <h3 className="text-xl font-bold text-slate-800">Review Dokumen <span className="text-blue-500">(Versi AI)</span></h3>
                             <div className="flex gap-3">
-                                <button onClick={() => setStep('form')} className="px-5 py-2.5 border border-slate-300 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition">Edit Form</button>
-
-                                {/* TAMBAHAN: Tombol Simpan ke Database */}
-                                <button onClick={simpanDokumen} className="px-5 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md hover:shadow-lg transition flex items-center gap-2">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                                    Simpan
-                                </button>
-
-                                <button onClick={unduhPDF} className="px-6 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md hover:shadow-lg transition flex items-center gap-2">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                    Unduh PDF
+                                <button disabled={isDownloading} onClick={() => setStep('form')} className="px-5 py-2.5 border border-slate-300 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition disabled:opacity-50">Edit Form</button>
+                                <button disabled={isDownloading} onClick={unduhPDF} className="px-6 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md transition flex items-center gap-2 disabled:opacity-50">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                    {isDownloading ? 'Memproses...' : 'Unduh PDF Asli'}
                                 </button>
                             </div>
                         </div>
 
-                        <div className="overflow-x-auto pb-12">
-                            <div id="kertas-surat" className="bg-white mx-auto shadow-2xl" style={{ width: '210mm', minHeight: '297mm', padding: '25.4mm', boxSizing: 'border-box' }}>
+                        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-6 items-center">
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-500 block mb-1 font-bold">Ukuran Kertas</label>
+                                <select value={pengaturan.kertas} onChange={e => setPengaturan({ ...pengaturan, kertas: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                                    <option value="a4">A4 (21 x 29.7 cm)</option>
+                                    <option value="f4">F4 / Folio (21.5 x 33 cm)</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-500 block mb-1 font-bold">Jenis Font</label>
+                                <select value={pengaturan.fontFamily} onChange={e => setPengaturan({ ...pengaturan, fontFamily: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                                    <option value='"Times New Roman", Times, serif'>Times New Roman</option>
+                                    <option value='Arial, Helvetica, sans-serif'>Arial</option>
+                                    <option value='"Courier New", Courier, monospace'>Courier New</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-500 block mb-1 font-bold">Ukuran Font</label>
+                                <select value={pengaturan.fontSize} onChange={e => setPengaturan({ ...pengaturan, fontSize: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                                    <option value="10pt">10 pt</option>
+                                    <option value="11pt">11 pt</option>
+                                    <option value="12pt">12 pt (Standar)</option>
+                                    <option value="14pt">14 pt</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="w-full overflow-x-auto pb-12 flex md:justify-center bg-slate-200/50 p-2 md:p-6 rounded-xl border border-slate-300 shadow-inner">
+                            <div className="bg-white shadow-xl flex-shrink-0 relative transition-all duration-300" style={{ width: paperWidth, minHeight: paperHeight, padding: '25.4mm', boxSizing: 'border-box' }}>
                                 {kopSurat.tampilkan && (
                                     <div className="border-b-[3px] border-black pb-4 mb-8 flex items-center justify-between">
                                         <div className="w-24 flex-shrink-0">
                                             {kopSurat.logoKiri && <img src={kopSurat.logoKiri} alt="Logo Kiri" className="w-full h-auto object-contain max-h-24" />}
                                         </div>
                                         <div className="flex-grow text-center px-4">
-                                            <h1 className="text-2xl font-bold uppercase tracking-wide text-black mb-1">{kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
-                                            <p className="text-sm text-black mb-1">{kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
-                                            <p className="text-xs text-black">{kopSurat.kontakInstansi || 'Kontak: -'}</p>
+                                            <h1 className="text-xl md:text-2xl font-bold uppercase tracking-wide text-black mb-1" style={{ fontFamily: pengaturan.fontFamily }}>{kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
+                                            <p className="text-xs md:text-sm text-black mb-1" style={{ fontFamily: pengaturan.fontFamily }}>{kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
+                                            <p className="text-[10px] md:text-xs text-black" style={{ fontFamily: pengaturan.fontFamily }}>{kopSurat.kontakInstansi || 'Kontak: -'}</p>
                                         </div>
                                         <div className="w-24 flex-shrink-0 text-right">
                                             {kopSurat.logoKanan && <img src={kopSurat.logoKanan} alt="Logo Kanan" className="w-full h-auto object-contain max-h-24 ml-auto" />}
@@ -525,16 +668,20 @@ Instruksi Cerdas:
                                     </div>
                                 )}
 
-                                {/* Auto-resize textarea agar di PDF tidak terpotong */}
-                                <textarea
+                                {/* PERBAIKAN DI SINI: Penghapusan onInput agar ketikan mulus */}
+                                <div
                                     id="isi-surat-textarea"
-                                    className="w-full min-h-[150mm] resize-none outline-none text-justify text-black bg-transparent leading-relaxed overflow-hidden"
-                                    value={isiSurat}
-                                    onChange={handleTextareaChange}
-                                    style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt' }}
-                                />
+                                    ref={editorRef}
+                                    contentEditable={true}
+                                    suppressContentEditableWarning={true}
+                                    onBlur={(e) => setIsiSurat(e.currentTarget.innerText)}
+                                    className="w-full outline-none text-black bg-transparent leading-relaxed whitespace-pre-wrap break-words"
+                                    style={{ fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, textAlign: 'justify', minHeight: '150mm' }}
+                                >
+                                    {isiSurat}
+                                </div>
 
-                                <div className="mt-8 flex justify-end" style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt' }}>
+                                <div className="mt-12 flex justify-end" style={{ fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize }}>
                                     <div className="text-center w-64 text-black">
                                         <p className="mb-2">{dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
                                         <p className="mb-4">Hormat saya,</p>
@@ -548,7 +695,6 @@ Instruksi Cerdas:
                                         </div>
 
                                         <p className="font-bold underline">{dataForm.nama || dataForm.nama1 || 'Nama Lengkap / Instansi'}</p>
-                                        {/* Untuk form yang punya 'posisi' atau 'jabatan', tampilkan di bawah nama jika ada */}
                                         {(dataForm.posisi || dataForm.jabatan) && (
                                             <p>{dataForm.posisi || dataForm.jabatan}</p>
                                         )}
@@ -559,6 +705,56 @@ Instruksi Cerdas:
                     </div>
                 )}
             </div>
+
+            <div style={{ position: 'absolute', left: '-9999px', top: '0', width: paperWidth, background: 'white' }}>
+                <div id="pdf-blueprint" style={{ width: '100%', boxSizing: 'border-box', color: 'black', background: 'white', padding: '0mm 2mm 0mm 0mm' }}>
+                    {kopSurat.tampilkan && (
+                        <table style={{ width: '100%', borderBottom: '3px solid black', marginBottom: '30px', borderCollapse: 'collapse' }}>
+                            <tbody>
+                                <tr>
+                                    <td style={{ width: '15%', verticalAlign: 'middle', padding: '0 0 15px 0' }}>
+                                        {kopSurat.logoKiri && <img src={kopSurat.logoKiri} alt="Logo" style={{ width: '100%', maxHeight: '85px', objectFit: 'contain', display: 'block' }} />}
+                                    </td>
+                                    <td style={{ width: '70%', textAlign: 'center', verticalAlign: 'middle', padding: '0 15px 15px 15px' }}>
+                                        <h1 style={{ fontSize: '18pt', fontWeight: 'bold', textTransform: 'uppercase', margin: '0 0 5px 0', fontFamily: pengaturan.fontFamily }}>{kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
+                                        <p style={{ fontSize: '12pt', margin: '0 0 5px 0', fontFamily: pengaturan.fontFamily }}>{kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
+                                        <p style={{ fontSize: '10pt', margin: 0, fontFamily: pengaturan.fontFamily }}>{kopSurat.kontakInstansi || 'Kontak: -'}</p>
+                                    </td>
+                                    <td style={{ width: '15%', textAlign: 'right', verticalAlign: 'middle', padding: '0 0 15px 0' }}>
+                                        {kopSurat.logoKanan && <img src={kopSurat.logoKanan} alt="Logo" style={{ width: '100%', maxHeight: '85px', objectFit: 'contain', display: 'block', marginLeft: 'auto' }} />}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    )}
+
+                    <div style={{ textAlign: 'justify', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: '1.5' }}>
+                        {isiSurat.split('\n').map((line, index) => (
+                            <p key={index} style={{ margin: '0', minHeight: '1em' }}>
+                                {line}
+                            </p>
+                        ))}
+                    </div>
+
+                    <div className="ttd-container" style={{ marginTop: '40px', width: '100%', overflow: 'hidden', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize }}>
+                        <div style={{ float: 'right', width: '250px', textAlign: 'center' }}>
+                            <p style={{ margin: '0 0 8px 0' }}>{dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
+                            <p style={{ margin: '0 0 16px 0' }}>Hormat saya,</p>
+
+                            <div style={{ height: '80px', margin: '8px 0', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                {tandaTangan && <img src={tandaTangan} alt="TTD" style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }} />}
+                            </div>
+
+                            <p style={{ fontWeight: 'bold', textDecoration: 'underline', margin: 0 }}>{dataForm.nama || dataForm.nama1 || 'Nama Lengkap'}</p>
+                            {(dataForm.posisi || dataForm.jabatan) && (
+                                <p style={{ margin: 0 }}>{dataForm.posisi || dataForm.jabatan}</p>
+                            )}
+                        </div>
+                        <div style={{ clear: 'both' }}></div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     );
 }

@@ -1,11 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Matikan static generation untuk halaman yang butuh data
-  output: 'standalone', 
-  experimental: {
-    // Membantu mencegah build hang pada project yang kompleks
-    serverComponentsExternalPackages: ['@supabase/supabase-js'],
-  },
+  output: 'standalone',
+
+  serverExternalPackages: ['@supabase/supabase-js'],
+
+  // Hanya digunakan saat development (npm run dev)
+  allowedDevOrigins: [
+    '192.168.1.8',
+    '10.18.118.146',
+    '192.168.1.7',
+    'localhost',
+    '127.0.0.1',
+  ],
 };
 
 export default nextConfig;
