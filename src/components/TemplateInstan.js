@@ -303,7 +303,11 @@ export default function TemplateInstan({ setHalamanAktif }) {
         }).catch((err) => {
             console.error("Gagal cetak client-side:", err);
             setIsDownloading(false);
-            setNotifPopup({ title: "Gagal Cetak", message: "Terjadi gangguan memori browser saat mengonversi file.", type: "error" });
+            setNotifPopup({
+                title: "Gagal Cetak",
+                message: `Detail error asli: ${err?.message || err?.toString() || 'Tidak diketahui'}`,
+                type: "error"
+            });
         });
     };
 
