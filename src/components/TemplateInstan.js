@@ -291,23 +291,28 @@ export default function TemplateInstan({ setHalamanAktif }) {
                 scrollX: 0,                         // 🔧 PATCH: cegah offset scroll ikut terhitung
                 windowWidth: element ? element.scrollWidth : undefined, // 🔧 PATCH: batasi lebar capture ke lebar blueprint asli
                 onclone: (clonedDoc) => {
-                    // 🔧 PATCH: Tailwind v4 pakai color-mix()/oklch()/lab() di banyak class
-                    // (misal bg-slate-900/50 di overlay modal). html2canvas versi CDN tidak
-                    // bisa parse fungsi warna itu meski elemennya tidak ikut tercetak di PDF.
-                    // Style ini HANYA berlaku di dokumen kloningan internal html2canvas,
-                    // TIDAK mengubah tampilan asli website yang dilihat user.
+                    // 🔧 PATCH FINAL: html2canvas gagal PARSING TEKS STYLESHEET Tailwind v4 itu sendiri
+                    // (karena isinya mengandung fungsi warna lab()/oklch() yang tidak didukung),
+                    // bukan cuma gagal saat menghitung warna per-elemen. Override !important saja
+                    // tidak cukup karena errornya terjadi sebelum override sempat dipakai.
+                    // Solusi: hapus SELURUH <style> & <link rel="stylesheet"> dari dokumen kloningan
+                    // (dokumen ini HANYA dipakai internal oleh html2canvas, TIDAK memengaruhi
+                    // tampilan asli website yang dilihat user), lalu suntik CSS pengganti minimal
+                    // yang cuma pakai warna hex biasa. Aman 100% karena #pdf-blueprint sudah
+                    // memakai inline style untuk semua warna/font/padding-nya, tidak bergantung
+                    // sama sekali pada class Tailwind.
+                    const semuaStylesheet = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
+                    semuaStylesheet.forEach((tag) => tag.parentNode && tag.parentNode.removeChild(tag));
+
                     const style = clonedDoc.createElement('style');
                     style.innerHTML = `
                         * {
                             color: #000000 !important;
-                            background-color: #ffffff !important;
+                            background: #ffffff !important;
                             border-color: #000000 !important;
                             box-shadow: none !important;
                         }
-                        #pdf-blueprint, #pdf-blueprint * {
-                            color: #000000 !important;
-                            background-color: transparent !important;
-                        }
+                        img { background: transparent !important; }
                     `;
                     clonedDoc.head.appendChild(style);
                 },
