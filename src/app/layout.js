@@ -89,11 +89,6 @@ export const metadata = {
     images: ["/seo-banner.png"],
   },
 
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/favicon.ico",
-  },
 };
 
 
