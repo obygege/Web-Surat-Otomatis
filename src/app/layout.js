@@ -67,14 +67,14 @@ export const metadata = {
     title: "Futura Docs",
     description:
       "Platform AI Pembuat Surat Resmi Indonesia.",
-    url: "https://futuradocs.id",
+    url: "https://suratotomatis.com",
     siteName: "Futura Docs",
     locale: "id_ID",
     type: "website",
 
     images: [
       {
-        url: "/seo-banner.png",
+        url: "/LOGO FUTURA LINK.png",
         width: 1200,
         height: 630,
       },
@@ -86,7 +86,11 @@ export const metadata = {
     title: "Futura Docs",
     description:
       "Platform AI Pembuat Surat Resmi Indonesia.",
-    images: ["/seo-banner.png"],
+    images: ["/LOGO FUTURA LINK.png"],
+  },
+
+  alternates: {
+    canonical: "https://suratotomatis.com",
   },
 
 };

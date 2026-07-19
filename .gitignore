@@ -36,7 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# next-sitemap (auto-generated setiap build, tidak perlu di-commit)
+/public/sitemap.xml
+/public/robots.txt
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-".env*.local" 
+".env*.local"
