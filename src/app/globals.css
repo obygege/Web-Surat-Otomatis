@@ -18,3 +18,10 @@
   --color-futura-text: #0f172a;
   --color-futura-muted: #64748b;
 }
+
+#pdf-blueprint,
+#pdf-blueprint * {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  border-color: #000000 !important;
+}

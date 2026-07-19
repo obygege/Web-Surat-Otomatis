@@ -611,7 +611,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
                    tapi html2canvas tidak lagi menghitung area offset raksasa saat cloning DOM,
                    yang sebelumnya menyebabkan alokasi canvas terlalu besar & crash memori di Android.
             ========================================================================================== */}
-            <div style={{ position: 'fixed', left: 0, top: 0, width: paperWidth, background: 'white', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
+            <div style={{ position: 'fixed', left: 0, top: 0, width: paperWidth, backgroundColor: '#ffffff', color: '#000000', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
                 <div id="pdf-blueprint" style={{ width: '100%', boxSizing: 'border-box', color: 'black', background: 'white', padding: '0mm 2mm 0mm 0mm' }}>
 
                     {/* Pembungkus Kop Surat Menggunakan Table agar HTML2Canvas tidak menggeser margin top */}
