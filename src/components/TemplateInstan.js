@@ -276,61 +276,60 @@ export default function TemplateInstan({ setHalamanAktif }) {
 
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const element = document.getElementById('pdf-blueprint');
+        const blueprintAsli = document.getElementById('pdf-blueprint');
         const isF4 = pengaturan.kertas === 'f4';
+
+        // =============================================================
+        // 🔧 SOLUSI FINAL: render blueprint di IFRAME KOSONG TERPISAH
+        // yang TIDAK PERNAH memuat stylesheet Tailwind v4 sama sekali.
+        // Karena #pdf-blueprint 100% pakai inline style (bukan class
+        // Tailwind), dia bisa dipindah utuh ke dokumen bersih ini.
+        // Hasilnya: tidak ada satupun teks lab()/oklch() yang bisa
+        // ditemui html2canvas di dokumen ini -> dijamin tidak error,
+        // bukan cuma "kemungkinan besar" seperti solusi sebelumnya.
+        // Ini juga otomatis menutup bug offset -9999px yang lama,
+        // karena elemen ini punya dokumennya sendiri yang bersih.
+        // =============================================================
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.left = '-99999px';
+        iframe.style.top = '0';
+        iframe.style.width = paperWidth;
+        iframe.style.border = 'none';
+        iframe.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(iframe);
+
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        iframeDoc.open();
+        iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;">${blueprintAsli.outerHTML}</body></html>`);
+        iframeDoc.close();
+
+        // Tunggu sebentar supaya gambar (logo/TTD base64) di dalam iframe selesai dimuat
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        const elementUntukDicetak = iframeDoc.getElementById('pdf-blueprint');
+
+        const bersihkanIframe = () => {
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        };
 
         const opt = {
             margin: [30, 25.4, 25.4, 25.4], // ⚠️ MARGIN ATAS DIKUNCI MATI 30mm (3 CM)
             filename: `Surat_${dataForm.nama || dataForm.nama1 || 'Instan'}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                scrollY: 0,
-                scrollX: 0,                         // 🔧 PATCH: cegah offset scroll ikut terhitung
-                windowWidth: element ? element.scrollWidth : undefined, // 🔧 PATCH: batasi lebar capture ke lebar blueprint asli
-                foreignObjectRendering: true,        // 🔧 PATCH FINAL: serahkan rendering ke mesin SVG bawaan
-                // browser, supaya parser CSS manual internal html2canvas (yang gagal baca
-                // lab()/oklch() dari Tailwind v4) dilewati sepenuhnya. Browser sendiri yang
-                // urus semua fungsi warna modern, bukan lagi html2canvas.
-                onclone: (clonedDoc) => {
-                    // 🔧 PATCH FINAL: html2canvas gagal PARSING TEKS STYLESHEET Tailwind v4 itu sendiri
-                    // (karena isinya mengandung fungsi warna lab()/oklch() yang tidak didukung),
-                    // bukan cuma gagal saat menghitung warna per-elemen. Override !important saja
-                    // tidak cukup karena errornya terjadi sebelum override sempat dipakai.
-                    // Solusi: hapus SELURUH <style> & <link rel="stylesheet"> dari dokumen kloningan
-                    // (dokumen ini HANYA dipakai internal oleh html2canvas, TIDAK memengaruhi
-                    // tampilan asli website yang dilihat user), lalu suntik CSS pengganti minimal
-                    // yang cuma pakai warna hex biasa. Aman 100% karena #pdf-blueprint sudah
-                    // memakai inline style untuk semua warna/font/padding-nya, tidak bergantung
-                    // sama sekali pada class Tailwind.
-                    const semuaStylesheet = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]');
-                    semuaStylesheet.forEach((tag) => tag.parentNode && tag.parentNode.removeChild(tag));
-
-                    const style = clonedDoc.createElement('style');
-                    style.innerHTML = `
-                        * {
-                            color: #000000 !important;
-                            background: #ffffff !important;
-                            border-color: #000000 !important;
-                            box-shadow: none !important;
-                        }
-                        img { background: transparent !important; }
-                    `;
-                    clonedDoc.head.appendChild(style);
-                },
-            },
+            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0 },
             jsPDF: { unit: 'mm', format: isF4 ? [215.9, 330.2] : 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['css', 'legacy'], avoid: ['p', '.ttd-container'] }
         };
 
-        window.html2pdf().set(opt).from(element).save().then(() => {
+        window.html2pdf().set(opt).from(elementUntukDicetak).save().then(() => {
+            bersihkanIframe();
             setIsDownloading(false);
             setNotifPopup(null);
             setShowSuccessAnim(true);
             setTimeout(() => setShowSuccessAnim(false), 3500);
         }).catch((err) => {
+            bersihkanIframe();
             console.error("Gagal cetak client-side:", err);
             setIsDownloading(false);
             setNotifPopup({
