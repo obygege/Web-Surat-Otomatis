@@ -290,6 +290,10 @@ export default function TemplateInstan({ setHalamanAktif }) {
                 scrollY: 0,
                 scrollX: 0,                         // 🔧 PATCH: cegah offset scroll ikut terhitung
                 windowWidth: element ? element.scrollWidth : undefined, // 🔧 PATCH: batasi lebar capture ke lebar blueprint asli
+                foreignObjectRendering: true,        // 🔧 PATCH FINAL: serahkan rendering ke mesin SVG bawaan
+                // browser, supaya parser CSS manual internal html2canvas (yang gagal baca
+                // lab()/oklch() dari Tailwind v4) dilewati sepenuhnya. Browser sendiri yang
+                // urus semua fungsi warna modern, bukan lagi html2canvas.
                 onclone: (clonedDoc) => {
                     // 🔧 PATCH FINAL: html2canvas gagal PARSING TEKS STYLESHEET Tailwind v4 itu sendiri
                     // (karena isinya mengandung fungsi warna lab()/oklch() yang tidak didukung),
