@@ -265,6 +265,9 @@ export default function TemplateInstan({ setHalamanAktif }) {
 
     // =================================================================
     // UNDUH PDF LANGSUNG (ANTI-SLICE & MARGIN 3CM ABSOLUT)
+    // 🔧 PATCH: html2canvas ditambah scrollX & windowWidth eksplisit
+    //    supaya tidak ikut menghitung area offset elemen offscreen,
+    //    yang sebelumnya bikin canvas raksasa & crash memori di Android.
     // =================================================================
     const unduhPDF = async () => {
         syncTextBeforeProcess();
@@ -280,7 +283,14 @@ export default function TemplateInstan({ setHalamanAktif }) {
             margin: [30, 25.4, 25.4, 25.4], // ⚠️ MARGIN ATAS DIKUNCI MATI 30mm (3 CM)
             filename: `Surat_${dataForm.nama || dataForm.nama1 || 'Instan'}.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                scrollY: 0,
+                scrollX: 0,                         // 🔧 PATCH: cegah offset scroll ikut terhitung
+                windowWidth: element ? element.scrollWidth : undefined, // 🔧 PATCH: batasi lebar capture ke lebar blueprint asli
+            },
             jsPDF: { unit: 'mm', format: isF4 ? [215.9, 330.2] : 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['css', 'legacy'], avoid: ['p', '.ttd-container'] }
         };
@@ -592,8 +602,12 @@ export default function TemplateInstan({ setHalamanAktif }) {
 
             {/* =========================================================================================
                 🔥 BLUEPRINT RAHASIA (MENGGUNAKAN TABLE UNTUK FIX MARGIN 3CM SECARA ABSOLUT) 🔥
+                🔧 PATCH: posisi wrapper diubah dari "left: -9999px" (jauh di luar layar) menjadi
+                   "position: fixed, top/left: 0, opacity: 0" — tetap tidak kelihatan user,
+                   tapi html2canvas tidak lagi menghitung area offset raksasa saat cloning DOM,
+                   yang sebelumnya menyebabkan alokasi canvas terlalu besar & crash memori di Android.
             ========================================================================================== */}
-            <div style={{ position: 'absolute', left: '-9999px', top: '0', width: paperWidth, background: 'white' }}>
+            <div style={{ position: 'fixed', left: 0, top: 0, width: paperWidth, background: 'white', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
                 <div id="pdf-blueprint" style={{ width: '100%', boxSizing: 'border-box', color: 'black', background: 'white', padding: '0mm 2mm 0mm 0mm' }}>
 
                     {/* Pembungkus Kop Surat Menggunakan Table agar HTML2Canvas tidak menggeser margin top */}

@@ -706,7 +706,7 @@ ATURAN MUTLAK:
                 )}
             </div>
 
-            <div style={{ position: 'absolute', left: '-9999px', top: '0', width: paperWidth, background: 'white' }}>
+            <div style={{ position: 'fixed', left: 0, top: 0, width: paperWidth, background: 'white', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
                 <div id="pdf-blueprint" style={{ width: '100%', boxSizing: 'border-box', color: 'black', background: 'white', padding: '0mm 2mm 0mm 0mm' }}>
                     {kopSurat.tampilkan && (
                         <table style={{ width: '100%', borderBottom: '3px solid black', marginBottom: '30px', borderCollapse: 'collapse' }}>
