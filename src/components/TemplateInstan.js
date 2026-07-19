@@ -290,6 +290,27 @@ export default function TemplateInstan({ setHalamanAktif }) {
                 scrollY: 0,
                 scrollX: 0,                         // 🔧 PATCH: cegah offset scroll ikut terhitung
                 windowWidth: element ? element.scrollWidth : undefined, // 🔧 PATCH: batasi lebar capture ke lebar blueprint asli
+                onclone: (clonedDoc) => {
+                    // 🔧 PATCH: Tailwind v4 pakai color-mix()/oklch()/lab() di banyak class
+                    // (misal bg-slate-900/50 di overlay modal). html2canvas versi CDN tidak
+                    // bisa parse fungsi warna itu meski elemennya tidak ikut tercetak di PDF.
+                    // Style ini HANYA berlaku di dokumen kloningan internal html2canvas,
+                    // TIDAK mengubah tampilan asli website yang dilihat user.
+                    const style = clonedDoc.createElement('style');
+                    style.innerHTML = `
+                        * {
+                            color: #000000 !important;
+                            background-color: #ffffff !important;
+                            border-color: #000000 !important;
+                            box-shadow: none !important;
+                        }
+                        #pdf-blueprint, #pdf-blueprint * {
+                            color: #000000 !important;
+                            background-color: transparent !important;
+                        }
+                    `;
+                    clonedDoc.head.appendChild(style);
+                },
             },
             jsPDF: { unit: 'mm', format: isF4 ? [215.9, 330.2] : 'a4', orientation: 'portrait' },
             pagebreak: { mode: ['css', 'legacy'], avoid: ['p', '.ttd-container'] }
@@ -611,7 +632,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
                    tapi html2canvas tidak lagi menghitung area offset raksasa saat cloning DOM,
                    yang sebelumnya menyebabkan alokasi canvas terlalu besar & crash memori di Android.
             ========================================================================================== */}
-            <div style={{ position: 'fixed', left: 0, top: 0, width: paperWidth, backgroundColor: '#ffffff', color: '#000000', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
+            <div style={{ position: 'fixed', left: 0, top: 0, width: paperWidth, background: 'white', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
                 <div id="pdf-blueprint" style={{ width: '100%', boxSizing: 'border-box', color: 'black', background: 'white', padding: '0mm 2mm 0mm 0mm' }}>
 
                     {/* Pembungkus Kop Surat Menggunakan Table agar HTML2Canvas tidak menggeser margin top */}
