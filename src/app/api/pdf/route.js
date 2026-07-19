@@ -6,7 +6,7 @@ export async function POST(req) {
         const { htmlContent, filename } = await req.json();
 
         // 🔥 API KEY PDFSHIFT (server-only, aman karena tidak pernah dikirim ke browser)
-        const API_KEY = "sk_c5dfe841095ac110c41303a39620499b279b0b1b";
+        const API_KEY = process.env.PDFSHIFT_API_KEY;
 
         if (!API_KEY) {
             return NextResponse.json({ error: "API Key kosong!" }, { status: 500 });
