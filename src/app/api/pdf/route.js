@@ -1,10 +1,15 @@
 // File: src/app/api/pdf/route.js
 import { NextResponse } from 'next/server';
-import chromium from '@sparticuz/chromium';
+import chromium from '@sparticuz/chromium-min';
 import puppeteer from 'puppeteer-core';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+// Binary Chromium diambil dari CDN saat runtime (bukan di-bundle),
+// jadi tidak ada lagi masalah file .so kepotong saat build.
+const CHROMIUM_PACK_URL =
+    'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar';
 
 export async function POST(req) {
     let browser = null;
@@ -18,19 +23,12 @@ export async function POST(req) {
 
         const isLocalDev = process.env.NODE_ENV === 'development';
 
-        // 🔧 FIX: matikan graphics mode supaya Chromium nggak minta
-        // lib grafis (termasuk libnss3.so) yang sering hilang di
-        // runtime serverless Vercel (Amazon Linux 2023)
-        if (!isLocalDev) {
-            chromium.setGraphicsMode = false;
-        }
-
         browser = await puppeteer.launch({
             args: isLocalDev ? [] : chromium.args,
             defaultViewport: chromium.defaultViewport,
             executablePath: isLocalDev
                 ? (process.env.PUPPETEER_EXECUTABLE_PATH || undefined)
-                : await chromium.executablePath(),
+                : await chromium.executablePath(CHROMIUM_PACK_URL),
             headless: isLocalDev ? true : chromium.headless,
         });
 

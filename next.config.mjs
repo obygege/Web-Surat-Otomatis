@@ -4,10 +4,6 @@ const nextConfig = {
 
   serverExternalPackages: ['@supabase/supabase-js', '@sparticuz/chromium', 'puppeteer-core'],
 
-  outputFileTracingIncludes: {
-    '/api/pdf/route': ['./node_modules/@sparticuz/chromium/**/*'],
-  },
-
   // Hanya digunakan saat development (npm run dev)
   allowedDevOrigins: [
     '192.168.1.8',
