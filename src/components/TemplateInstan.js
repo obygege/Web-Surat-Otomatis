@@ -270,74 +270,120 @@ export default function TemplateInstan({ setHalamanAktif }) {
     //    yang sebelumnya bikin canvas raksasa & crash memori di Android.
     // =================================================================
     const unduhPDF = async () => {
-        syncTextBeforeProcess();
+        const teksTerbaru = syncTextBeforeProcess();
         setIsDownloading(true);
-        setNotifPopup({ title: "Mengunduh PDF...", message: "File sedang dibuat dan akan langsung terunduh otomatis ke perangkat Anda...", type: "warning" });
+        setNotifPopup({ title: "Mengunduh PDF...", message: "File sedang dibuat di server dan akan langsung terunduh otomatis ke perangkat Anda...", type: "warning" });
 
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const blueprintAsli = document.getElementById('pdf-blueprint');
         const isF4 = pengaturan.kertas === 'f4';
+        const ukuranKertas = isF4 ? '215.9mm 330.2mm' : '210mm 297mm';
 
         // =============================================================
-        // 🔧 SOLUSI FINAL: render blueprint di IFRAME KOSONG TERPISAH
-        // yang TIDAK PERNAH memuat stylesheet Tailwind v4 sama sekali.
-        // Karena #pdf-blueprint 100% pakai inline style (bukan class
-        // Tailwind), dia bisa dipindah utuh ke dokumen bersih ini.
-        // Hasilnya: tidak ada satupun teks lab()/oklch() yang bisa
-        // ditemui html2canvas di dokumen ini -> dijamin tidak error,
-        // bukan cuma "kemungkinan besar" seperti solusi sebelumnya.
-        // Ini juga otomatis menutup bug offset -9999px yang lama,
-        // karena elemen ini punya dokumennya sendiri yang bersih.
+        // 🔧 GANTI LIBRARY: dari html2pdf.js (client-side, rawan crash
+        // di Android karena parser CSS-nya tidak paham lab()/oklch())
+        // jadi PDFShift (server-side, pakai headless Chrome asli di
+        // server). Semua fitur surat (kop surat, logo, TTD, pilihan
+        // kertas A4/F4, font, margin 30mm atas) tetap sama persis,
+        // cuma cara generate PDF-nya dipindah dari HP ke server.
         // =============================================================
-        const iframe = document.createElement('iframe');
-        iframe.style.position = 'fixed';
-        iframe.style.left = '-99999px';
-        iframe.style.top = '0';
-        iframe.style.width = paperWidth;
-        iframe.style.border = 'none';
-        iframe.setAttribute('aria-hidden', 'true');
-        document.body.appendChild(iframe);
+        const htmlKopSurat = kopSurat.tampilkan ? `
+            <table style="width:100%;border-bottom:3px solid black;margin-bottom:30px;border-collapse:collapse;">
+                <tbody>
+                    <tr>
+                        <td style="width:15%;vertical-align:middle;padding:0 0 15px 0;">
+                            ${kopSurat.logoKiri ? `<img src="${kopSurat.logoKiri}" style="width:100%;max-height:85px;object-fit:contain;display:block;" />` : ''}
+                        </td>
+                        <td style="width:70%;text-align:center;vertical-align:middle;padding:0 15px 15px 15px;">
+                            <h1 style="font-size:18pt;font-weight:bold;text-transform:uppercase;margin:0 0 5px 0;font-family:${pengaturan.fontFamily};">${kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
+                            <p style="font-size:12pt;margin:0 0 5px 0;font-family:${pengaturan.fontFamily};">${kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
+                            <p style="font-size:10pt;margin:0;font-family:${pengaturan.fontFamily};">${kopSurat.kontakInstansi || 'Kontak: -'}</p>
+                        </td>
+                        <td style="width:15%;text-align:right;vertical-align:middle;padding:0 0 15px 0;">
+                            ${kopSurat.logoKanan ? `<img src="${kopSurat.logoKanan}" style="width:100%;max-height:85px;object-fit:contain;display:block;margin-left:auto;" />` : ''}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        ` : '';
 
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-        iframeDoc.open();
-        iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;">${blueprintAsli.outerHTML}</body></html>`);
-        iframeDoc.close();
+        const htmlIsiSurat = teksTerbaru.split('\n').map((line) =>
+            `<p style="margin:0;min-height:1em;">${line.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+        ).join('');
 
-        // Tunggu sebentar supaya gambar (logo/TTD base64) di dalam iframe selesai dimuat
-        await new Promise(resolve => setTimeout(resolve, 400));
+        const htmlTtd = `
+            <div style="margin-top:40px;width:100%;overflow:hidden;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};">
+                <div style="float:right;width:250px;text-align:center;">
+                    <p style="margin:0 0 8px 0;">${dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
+                    <p style="margin:0 0 16px 0;">Hormat saya,</p>
+                    <div style="height:80px;margin:8px 0;display:flex;justify-content:center;align-items:center;">
+                        ${tandaTangan ? `<img src="${tandaTangan}" style="max-height:80px;max-width:100%;object-fit:contain;" />` : ''}
+                    </div>
+                    <p style="font-weight:bold;text-decoration:underline;margin:0;">${dataForm.nama || dataForm.nama1 || 'Nama Lengkap'}</p>
+                    ${(dataForm.posisi || dataForm.jabatan) ? `<p style="margin:0;">${dataForm.posisi || dataForm.jabatan}</p>` : ''}
+                </div>
+                <div style="clear:both;"></div>
+            </div>
+        `;
 
-        const elementUntukDicetak = iframeDoc.getElementById('pdf-blueprint');
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <style>
+                    @page { size: ${ukuranKertas}; margin: 30mm 25.4mm 25.4mm 25.4mm; }
+                    body { margin: 0; padding: 0; color: #000000; background: #ffffff; }
+                </style>
+            </head>
+            <body>
+                <div style="width:100%;box-sizing:border-box;color:#000000;background:#ffffff;">
+                    ${htmlKopSurat}
+                    <div style="text-align:justify;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};line-height:1.5;">
+                        ${htmlIsiSurat}
+                    </div>
+                    ${htmlTtd}
+                </div>
+            </body>
+            </html>
+        `;
 
-        const bersihkanIframe = () => {
-            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-        };
+        try {
+            const response = await fetch('/api/pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    htmlContent,
+                    filename: `Surat_${dataForm.nama || dataForm.nama1 || 'Instan'}.pdf`,
+                }),
+            });
 
-        const opt = {
-            margin: [30, 25.4, 25.4, 25.4], // ⚠️ MARGIN ATAS DIKUNCI MATI 30mm (3 CM)
-            filename: `Surat_${dataForm.nama || dataForm.nama1 || 'Instan'}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, scrollX: 0 },
-            jsPDF: { unit: 'mm', format: isF4 ? [215.9, 330.2] : 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['css', 'legacy'], avoid: ['p', '.ttd-container'] }
-        };
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText);
+            }
 
-        window.html2pdf().set(opt).from(elementUntukDicetak).save().then(() => {
-            bersihkanIframe();
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Surat_${dataForm.nama || dataForm.nama1 || 'Instan'}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
             setIsDownloading(false);
             setNotifPopup(null);
             setShowSuccessAnim(true);
             setTimeout(() => setShowSuccessAnim(false), 3500);
-        }).catch((err) => {
-            bersihkanIframe();
-            console.error("Gagal cetak client-side:", err);
+        } catch (err) {
+            console.error("Gagal cetak server-side:", err);
             setIsDownloading(false);
             setNotifPopup({
                 title: "Gagal Cetak",
                 message: `Detail error asli: ${err?.message || err?.toString() || 'Tidak diketahui'}`,
                 type: "error"
             });
-        });
+        }
     };
 
     const handleBayarPremium = async () => {
