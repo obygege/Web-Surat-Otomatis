@@ -32,7 +32,8 @@ export default function TemplateInstan({ setHalamanAktif }) {
     const [pengaturan, setPengaturan] = useState({
         kertas: 'a4', // 'a4' atau 'f4'
         fontFamily: '"Times New Roman", Times, serif',
-        fontSize: '12pt'
+        fontSize: '12pt',
+        spasi: '1.5'
     });
 
     // State Kop Surat & TTD
@@ -65,7 +66,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
                 if (parsed.tandaTangan) setTandaTangan(parsed.tandaTangan);
                 if (parsed.documentId) setDocumentId(parsed.documentId);
                 if (parsed.sigMode) setSigMode(parsed.sigMode);
-                if (parsed.pengaturan) setPengaturan(parsed.pengaturan);
+                if (parsed.pengaturan) setPengaturan({ spasi: '1.5', ...parsed.pengaturan });
             } catch (e) {
                 console.error("Gagal meload draft otomatis", e);
             }
@@ -146,7 +147,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
         setKopSurat({ tampilkan: false, namaInstansi: '', alamatInstansi: '', kontakInstansi: '', logoKiri: null, logoKanan: null });
         setTandaTangan(null);
         setDocumentId(null);
-        setPengaturan({ kertas: 'a4', fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt' });
+        setPengaturan({ kertas: 'a4', fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt', spasi: '1.5' });
     };
 
     // =================================================================
@@ -280,8 +281,9 @@ export default function TemplateInstan({ setHalamanAktif }) {
         // =============================================================
         // 🔧 GANTI LIBRARY: dari html2pdf.js (client-side, rawan crash
         // di Android karena parser CSS-nya tidak paham lab()/oklch())
-        // jadi PDFShift (server-side, pakai headless Chrome asli di
-        // server). Semua fitur surat (kop surat, logo, TTD, pilihan
+        // jadi Puppeteer + @sparticuz/chromium (server-side, gratis,
+        // pakai headless Chrome asli di server sendiri, tanpa API key).
+        // Semua fitur surat (kop surat, logo, TTD, pilihan
         // kertas A4/F4, font, margin 30mm atas) tetap sama persis,
         // cuma cara generate PDF-nya dipindah dari HP ke server.
         // =============================================================
@@ -337,7 +339,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
             <body>
                 <div style="width:100%;box-sizing:border-box;color:#000000;background:#ffffff;">
                     ${htmlKopSurat}
-                    <div style="text-align:justify;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};line-height:1.5;">
+                    <div style="text-align:justify;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};line-height:${pengaturan.spasi};">
                         ${htmlIsiSurat}
                     </div>
                     ${htmlTtd}
@@ -620,6 +622,15 @@ export default function TemplateInstan({ setHalamanAktif }) {
                                     <option value="14pt">14 pt</option>
                                 </select>
                             </div>
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-500 block mb-1 font-bold">Spasi Baris</label>
+                                <select value={pengaturan.spasi} onChange={e => setPengaturan({ ...pengaturan, spasi: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-purple-500 transition">
+                                    <option value="1">1.0 (Rapat)</option>
+                                    <option value="1.15">1.15</option>
+                                    <option value="1.5">1.5 (Standar)</option>
+                                    <option value="2">2.0 (Renggang)</option>
+                                </select>
+                            </div>
                         </div>
 
                         {/* TAMPILAN KERTAS UNTUK EDITOR DI LAYAR (MENGGUNAKAN DIV CONTENTEDITABLE) */}
@@ -648,8 +659,8 @@ export default function TemplateInstan({ setHalamanAktif }) {
                                     suppressContentEditableWarning={true}
                                     onBlur={(e) => setIsiSurat(e.currentTarget.innerText)}
                                     onInput={(e) => setIsiSurat(e.currentTarget.innerText)}
-                                    className="w-full outline-none text-black bg-transparent leading-relaxed whitespace-pre-wrap break-words"
-                                    style={{ fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, textAlign: 'justify', minHeight: '150mm' }}
+                                    className="w-full outline-none text-black bg-transparent whitespace-pre-wrap break-words"
+                                    style={{ fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: pengaturan.spasi, textAlign: 'justify', minHeight: '150mm' }}
                                 >
                                     {isiSurat}
                                 </div>
@@ -710,7 +721,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
                         </table>
                     )}
 
-                    <div style={{ textAlign: 'justify', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: '1.5' }}>
+                    <div style={{ textAlign: 'justify', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: pengaturan.spasi }}>
                         {isiSurat.split('\n').map((line, index) => (
                             <p key={index} style={{ margin: '0', minHeight: '1em' }}>
                                 {line}

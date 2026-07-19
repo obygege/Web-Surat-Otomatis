@@ -32,7 +32,8 @@ export default function SuratEditor({ setHalamanAktif }) {
     const [pengaturan, setPengaturan] = useState({
         kertas: 'a4',
         fontFamily: '"Times New Roman", Times, serif',
-        fontSize: '12pt'
+        fontSize: '12pt',
+        spasi: '1.5'
     });
 
     // State Kop Surat & Tanda Tangan
@@ -104,7 +105,7 @@ export default function SuratEditor({ setHalamanAktif }) {
                 if (parsed.tandaTangan) setTandaTangan(parsed.tandaTangan);
                 if (parsed.documentId) setDocumentId(parsed.documentId);
                 if (parsed.sigMode) setSigMode(parsed.sigMode);
-                if (parsed.pengaturan) setPengaturan(parsed.pengaturan);
+                if (parsed.pengaturan) setPengaturan({ spasi: '1.5', ...parsed.pengaturan });
             } catch (e) {
                 console.error("Gagal meload draft otomatis", e);
             }
@@ -177,7 +178,7 @@ export default function SuratEditor({ setHalamanAktif }) {
         setKopSurat({ tampilkan: false, namaInstansi: '', alamatInstansi: '', kontakInstansi: '', logoKiri: null, logoKanan: null });
         setTandaTangan(null);
         setDocumentId(null);
-        setPengaturan({ kertas: 'a4', fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt' });
+        setPengaturan({ kertas: 'a4', fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt', spasi: '1.5' });
     };
 
     // =================================================================
@@ -374,37 +375,122 @@ ATURAN MUTLAK:
     };
 
     // =================================================================
-    // UNDUH PDF LANGSUNG
+    // UNDUH PDF LANGSUNG (SERVER-SIDE)
+    // 🔧 GANTI LIBRARY: dari html2pdf.js (client-side, rawan crash di
+    // Android karena parser CSS-nya tidak paham lab()/oklch()) jadi
+    // generate PDF lewat server (/api/pdf, Puppeteer + Chromium),
+    // sama seperti mode Template Instan. Semua fitur surat hasil AI
+    // (kop surat, logo, TTD, kertas A4/F4, font, ukuran font, spasi,
+    // margin 30mm atas) tetap sama persis, cuma cara generate PDF-nya
+    // dipindah dari HP ke server supaya jauh lebih stabil.
     // =================================================================
     const unduhPDF = async () => {
-        syncTextBeforeProcess();
+        const teksTerbaru = syncTextBeforeProcess();
         setIsDownloading(true);
-        setNotifPopup({ title: "Mengunduh PDF...", message: "File sedang dibuat dan akan langsung terunduh otomatis ke perangkat Anda...", type: "warning" });
+        setNotifPopup({ title: "Mengunduh PDF...", message: "File sedang dibuat di server dan akan langsung terunduh otomatis ke perangkat Anda...", type: "warning" });
 
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const element = document.getElementById('pdf-blueprint');
         const isF4 = pengaturan.kertas === 'f4';
+        const ukuranKertas = isF4 ? '215.9mm 330.2mm' : '210mm 297mm';
 
-        const opt = {
-            margin: [30, 30, 30, 30],
-            filename: `Surat_${dataForm.nama || dataForm.nama1 || 'Futura'}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0 },
-            jsPDF: { unit: 'mm', format: isF4 ? [215.9, 330.2] : 'a4', orientation: 'portrait' },
-            pagebreak: { mode: ['css', 'legacy'], avoid: ['p', '.ttd-container'] }
-        };
+        const htmlKopSurat = kopSurat.tampilkan ? `
+            <table style="width:100%;border-bottom:3px solid black;margin-bottom:30px;border-collapse:collapse;">
+                <tbody>
+                    <tr>
+                        <td style="width:15%;vertical-align:middle;padding:0 0 15px 0;">
+                            ${kopSurat.logoKiri ? `<img src="${kopSurat.logoKiri}" style="width:100%;max-height:85px;object-fit:contain;display:block;" />` : ''}
+                        </td>
+                        <td style="width:70%;text-align:center;vertical-align:middle;padding:0 15px 15px 15px;">
+                            <h1 style="font-size:18pt;font-weight:bold;text-transform:uppercase;margin:0 0 5px 0;font-family:${pengaturan.fontFamily};">${kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
+                            <p style="font-size:12pt;margin:0 0 5px 0;font-family:${pengaturan.fontFamily};">${kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
+                            <p style="font-size:10pt;margin:0;font-family:${pengaturan.fontFamily};">${kopSurat.kontakInstansi || 'Kontak: -'}</p>
+                        </td>
+                        <td style="width:15%;text-align:right;vertical-align:middle;padding:0 0 15px 0;">
+                            ${kopSurat.logoKanan ? `<img src="${kopSurat.logoKanan}" style="width:100%;max-height:85px;object-fit:contain;display:block;margin-left:auto;" />` : ''}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        ` : '';
 
-        window.html2pdf().set(opt).from(element).save().then(() => {
+        const htmlIsiSurat = teksTerbaru.split('\n').map((line) =>
+            `<p style="margin:0;min-height:1em;">${line.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+        ).join('');
+
+        const htmlTtd = `
+            <div style="margin-top:40px;width:100%;overflow:hidden;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};">
+                <div style="float:right;width:250px;text-align:center;">
+                    <p style="margin:0 0 8px 0;">${dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
+                    <p style="margin:0 0 16px 0;">Hormat saya,</p>
+                    <div style="height:80px;margin:8px 0;display:flex;justify-content:center;align-items:center;">
+                        ${tandaTangan ? `<img src="${tandaTangan}" style="max-height:80px;max-width:100%;object-fit:contain;" />` : ''}
+                    </div>
+                    <p style="font-weight:bold;text-decoration:underline;margin:0;">${dataForm.nama || dataForm.nama1 || 'Nama Lengkap'}</p>
+                    ${(dataForm.posisi || dataForm.jabatan) ? `<p style="margin:0;">${dataForm.posisi || dataForm.jabatan}</p>` : ''}
+                </div>
+                <div style="clear:both;"></div>
+            </div>
+        `;
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <style>
+                    @page { size: ${ukuranKertas}; margin: 30mm 25.4mm 25.4mm 25.4mm; }
+                    body { margin: 0; padding: 0; color: #000000; background: #ffffff; }
+                </style>
+            </head>
+            <body>
+                <div style="width:100%;box-sizing:border-box;color:#000000;background:#ffffff;">
+                    ${htmlKopSurat}
+                    <div style="text-align:justify;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};line-height:${pengaturan.spasi};">
+                        ${htmlIsiSurat}
+                    </div>
+                    ${htmlTtd}
+                </div>
+            </body>
+            </html>
+        `;
+
+        try {
+            const response = await fetch('/api/pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    htmlContent,
+                    filename: `Surat_${dataForm.nama || dataForm.nama1 || 'Futura'}.pdf`,
+                }),
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Surat_${dataForm.nama || dataForm.nama1 || 'Futura'}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
             setIsDownloading(false);
             setNotifPopup(null);
             setShowSuccessAnim(true);
             setTimeout(() => setShowSuccessAnim(false), 3500);
-        }).catch((err) => {
-            console.error("Gagal cetak:", err);
+        } catch (err) {
+            console.error("Gagal cetak server-side:", err);
             setIsDownloading(false);
-            setNotifPopup({ title: "Gagal Cetak", message: "Terjadi gangguan memori browser saat mengonversi file.", type: "error" });
-        });
+            setNotifPopup({
+                title: "Gagal Cetak",
+                message: `Detail error asli: ${err?.message || err?.toString() || 'Tidak diketahui'}`,
+                type: "error"
+            });
+        }
     };
 
     const handleBayarPremium = async () => {
@@ -648,6 +734,15 @@ ATURAN MUTLAK:
                                     <option value="14pt">14 pt</option>
                                 </select>
                             </div>
+                            <div className="flex flex-col">
+                                <label className="text-xs text-slate-500 block mb-1 font-bold">Spasi Baris</label>
+                                <select value={pengaturan.spasi} onChange={e => setPengaturan({ ...pengaturan, spasi: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                                    <option value="1">1.0 (Rapat)</option>
+                                    <option value="1.15">1.15</option>
+                                    <option value="1.5">1.5 (Standar)</option>
+                                    <option value="2">2.0 (Renggang)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div className="w-full overflow-x-auto pb-12 flex md:justify-center bg-slate-200/50 p-2 md:p-6 rounded-xl border border-slate-300 shadow-inner">
@@ -675,8 +770,8 @@ ATURAN MUTLAK:
                                     contentEditable={true}
                                     suppressContentEditableWarning={true}
                                     onBlur={(e) => setIsiSurat(e.currentTarget.innerText)}
-                                    className="w-full outline-none text-black bg-transparent leading-relaxed whitespace-pre-wrap break-words"
-                                    style={{ fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, textAlign: 'justify', minHeight: '150mm' }}
+                                    className="w-full outline-none text-black bg-transparent whitespace-pre-wrap break-words"
+                                    style={{ fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: pengaturan.spasi, textAlign: 'justify', minHeight: '150mm' }}
                                 >
                                     {isiSurat}
                                 </div>
@@ -728,7 +823,7 @@ ATURAN MUTLAK:
                         </table>
                     )}
 
-                    <div style={{ textAlign: 'justify', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: '1.5' }}>
+                    <div style={{ textAlign: 'justify', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: pengaturan.spasi }}>
                         {isiSurat.split('\n').map((line, index) => (
                             <p key={index} style={{ margin: '0', minHeight: '1em' }}>
                                 {line}
