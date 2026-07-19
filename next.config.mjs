@@ -2,7 +2,7 @@
 const nextConfig = {
   output: 'standalone',
 
-  serverExternalPackages: ['@supabase/supabase-js'],
+  serverExternalPackages: ['@supabase/supabase-js', '@sparticuz/chromium', 'puppeteer-core'],
 
   // Hanya digunakan saat development (npm run dev)
   allowedDevOrigins: [

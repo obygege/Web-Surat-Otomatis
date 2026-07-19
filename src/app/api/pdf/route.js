@@ -1,39 +1,42 @@
 // File: src/app/api/pdf/route.js
 import { NextResponse } from 'next/server';
+import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer-core';
+
+export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function POST(req) {
+    let browser = null;
+
     try {
         const { htmlContent, filename } = await req.json();
 
-        // 🔥 API KEY PDFSHIFT (server-only, aman karena tidak pernah dikirim ke browser)
-        const API_KEY = process.env.PDFSHIFT_API_KEY;
-
-        if (!API_KEY) {
-            return NextResponse.json({ error: "API Key kosong!" }, { status: 500 });
+        if (!htmlContent) {
+            return NextResponse.json({ error: "Konten HTML kosong!" }, { status: 400 });
         }
 
-        const authHeader = 'Basic ' + Buffer.from(API_KEY + ':').toString('base64');
+        const isLocalDev = process.env.NODE_ENV === 'development';
 
-        // Ukuran kertas & margin sudah ditentukan lewat CSS @page di dalam htmlContent
-        // (dikirim dari frontend), jadi di sini kita tidak perlu override format lagi.
-        const response = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
-            method: 'POST',
-            headers: {
-                'Authorization': authHeader,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                source: htmlContent,
-                use_print: true, // hormati aturan @page dari CSS yang dikirim
-            })
+        browser = await puppeteer.launch({
+            args: isLocalDev ? [] : chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: isLocalDev
+                ? (process.env.PUPPETEER_EXECUTABLE_PATH || undefined)
+                : await chromium.executablePath(),
+            headless: isLocalDev ? true : chromium.headless,
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText);
-        }
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
 
-        const pdfBuffer = await response.arrayBuffer();
+        const pdfBuffer = await page.pdf({
+            printBackground: true,
+            preferCSSPageSize: true,
+        });
+
+        await browser.close();
+        browser = null;
 
         return new NextResponse(pdfBuffer, {
             status: 200,
@@ -44,6 +47,9 @@ export async function POST(req) {
         });
     } catch (error) {
         console.error("API PDF Error:", error.message);
+        if (browser) {
+            try { await browser.close(); } catch (e) { }
+        }
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
