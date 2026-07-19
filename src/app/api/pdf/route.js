@@ -18,6 +18,13 @@ export async function POST(req) {
 
         const isLocalDev = process.env.NODE_ENV === 'development';
 
+        // 🔧 FIX: matikan graphics mode supaya Chromium nggak minta
+        // lib grafis (termasuk libnss3.so) yang sering hilang di
+        // runtime serverless Vercel (Amazon Linux 2023)
+        if (!isLocalDev) {
+            chromium.setGraphicsMode = false;
+        }
+
         browser = await puppeteer.launch({
             args: isLocalDev ? [] : chromium.args,
             defaultViewport: chromium.defaultViewport,
