@@ -21,7 +21,7 @@ export default function KontakPage() {
             <p className="text-slate-500 text-sm mb-3">Respon dalam 1x24 jam kerja.</p>
             {/* TODO: ganti dengan email resmi Anda */}
             <a href="mailto:support@futuralink.id" className="text-blue-600 font-medium hover:underline">
-              support@futuralink.id
+              futuralink9@gmail.com
             </a>
           </div>
 
@@ -29,8 +29,8 @@ export default function KontakPage() {
             <h2 className="font-bold text-lg mb-1">WhatsApp / Telepon</h2>
             <p className="text-slate-500 text-sm mb-3">Jam operasional: 09.00 - 21.00 WIB.</p>
             {/* TODO: ganti dengan nomor WhatsApp resmi Anda */}
-            <a href="https://wa.me/6281234567890" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-medium hover:underline">
-              +62 812-3456-7890
+            <a href="https://wa.me/6289655939955" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-medium hover:underline">
+              +62 896 5593 9955
             </a>
           </div>
         </div>
@@ -38,7 +38,7 @@ export default function KontakPage() {
         <div className="mt-8 bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           <h2 className="font-bold text-lg mb-1">Alamat Operasional</h2>
           {/* TODO: ganti dengan alamat resmi Anda */}
-          <p className="text-slate-600 text-sm">Futura Link, Indonesia.</p>
+          <p className="text-slate-600 text-sm">Jl. Selarai RT. 018 Rw. 005 Kel. Balai Agung Kec. Sekayu Kab. Muba</p>
         </div>
 
         <div className="mt-10 flex gap-4 text-sm">
