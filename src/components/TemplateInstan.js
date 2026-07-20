@@ -339,7 +339,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
             <body>
                 <div style="width:100%;box-sizing:border-box;color:#000000;background:#ffffff;">
                     ${htmlKopSurat}
-                    <div style="text-align:justify;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};line-height:${pengaturan.spasi};">
+                    <div style="text-align:justify;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};line-height:${pengaturan.spasi};white-space:pre-wrap;">
                         ${htmlIsiSurat}
                     </div>
                     ${htmlTtd}

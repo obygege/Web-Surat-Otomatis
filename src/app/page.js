@@ -627,11 +627,23 @@ export default function Home() {
       </main>
 
       <footer className="bg-slate-950 text-slate-400 py-12 px-6 text-center text-sm">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent font-bold text-lg">Futura Docs</span>
+        <div className="max-w-6xl mx-auto flex flex-col gap-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent font-bold text-lg">Futura Docs</span>
+            </div>
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+              <a href="/kontak" className="hover:text-white transition">Kontak Kami</a>
+              <a href="/syarat-ketentuan" className="hover:text-white transition">Syarat &amp; Ketentuan</a>
+              <a href="/kebijakan-pengembalian" className="hover:text-white transition">Kebijakan Pengembalian Dana</a>
+            </div>
           </div>
-          <p>&copy; 2026 Hak Cipta Dilindungi. Dikembangkan oleh Futura Link.</p>
+          {/* TODO: ganti href di bawah dengan URL resmi Futura Link Anda */}
+          <p>&copy; 2026 Hak Cipta Dilindungi. Dikembangkan oleh{' '}
+            <a href="https://futuralink.id" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline underline-offset-2">
+              Futura Link
+            </a>.
+          </p>
         </div>
       </footer>
     </div>
