@@ -640,7 +640,7 @@ export default function Home() {
           </div>
           {/* TODO: ganti href di bawah dengan URL resmi Futura Link Anda */}
           <p>&copy; 2026 Hak Cipta Dilindungi. Dikembangkan oleh{' '}
-            <a href="https://futuralink.id" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline underline-offset-2">
+            <a href="https://futuraalink.id" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline underline-offset-2">
               Futura Link
             </a>.
           </p>
