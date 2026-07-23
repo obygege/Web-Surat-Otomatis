@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { verifyAdminToken } from './src/lib/adminAuth';  // ← diubah dari './lib/adminAuth'
+import { verifyAdminTokenEdge } from './src/lib/adminAuth';
 
-export function middleware(req) {
+export async function middleware(req) {
   const { pathname } = req.nextUrl;
 
   if (pathname.startsWith('/admin/dashboard')) {
     const token = req.cookies.get('admin_session')?.value;
-    const valid = token && verifyAdminToken(token);
+    const valid = token && (await verifyAdminTokenEdge(token));
 
     if (!valid) {
       const loginUrl = new URL('/admin/login', req.url);

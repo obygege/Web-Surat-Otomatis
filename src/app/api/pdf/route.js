@@ -6,8 +6,6 @@ import puppeteer from 'puppeteer-core';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-// Binary Chromium diambil dari CDN saat runtime (bukan di-bundle),
-// jadi tidak ada lagi masalah file .so kepotong saat build.
 const CHROMIUM_PACK_URL =
     'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar';
 
@@ -15,7 +13,12 @@ export async function POST(req) {
     let browser = null;
 
     try {
-        const { htmlContent, filename } = await req.json();
+        // [PERBAIKAN WAJIB]: Gunakan req.text() BUKAN req.json()
+        // Ini memastikan server menerima raw HTML tanpa mencoba mem-parsingnya sebagai JSON
+        const htmlContent = await req.text();
+
+        // Ambil nama file dari custom header yang dikirim client
+        const filename = req.headers.get('x-filename') || 'suratotomatis.pdf';
 
         if (!htmlContent) {
             return NextResponse.json({ error: "Konten HTML kosong!" }, { status: 400 });
@@ -23,14 +26,19 @@ export async function POST(req) {
 
         const isLocalDev = process.env.NODE_ENV === 'development';
 
-        browser = await puppeteer.launch({
+        const launchOptions = {
             args: isLocalDev ? [] : chromium.args,
             defaultViewport: chromium.defaultViewport,
-            executablePath: isLocalDev
-                ? (process.env.PUPPETEER_EXECUTABLE_PATH || undefined)
-                : await chromium.executablePath(CHROMIUM_PACK_URL),
             headless: isLocalDev ? true : chromium.headless,
-        });
+        };
+
+        if (isLocalDev) {
+            launchOptions.channel = 'chrome';
+        } else {
+            launchOptions.executablePath = await chromium.executablePath(CHROMIUM_PACK_URL);
+        }
+
+        browser = await puppeteer.launch(launchOptions);
 
         const page = await browser.newPage();
         await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
@@ -47,7 +55,7 @@ export async function POST(req) {
             status: 200,
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="${filename || 'dokumen.pdf'}"`,
+                'Content-Disposition': `attachment; filename="${filename}"`,
             },
         });
     } catch (error) {

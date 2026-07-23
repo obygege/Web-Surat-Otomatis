@@ -28,7 +28,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
     // State Loading PDF
     const [isDownloading, setIsDownloading] = useState(false);
 
-    // 🔥 FITUR BARU: Pengaturan Kertas, Font, dan Ukuran
+    // Pengaturan Kertas, Font, dan Ukuran
     const [pengaturan, setPengaturan] = useState({
         kertas: 'a4', // 'a4' atau 'f4'
         fontFamily: '"Times New Roman", Times, serif',
@@ -50,9 +50,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
     const editorRef = useRef(null);
     const isInitialMount = useRef(true);
 
-    // =================================================================
-    // LOAD DATA DARI LOCAL STORAGE SAAT REFRESH
-    // =================================================================
     useEffect(() => {
         const savedDraft = localStorage.getItem('surat_draft_instan_futura');
         if (savedDraft) {
@@ -73,32 +70,16 @@ export default function TemplateInstan({ setHalamanAktif }) {
         }
     }, []);
 
-    // =================================================================
-    // AUTO-SAVE KE LOCAL STORAGE SAAT ADA PERUBAHAN
-    // =================================================================
     useEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false;
             return;
         }
 
-        const draft = {
-            step,
-            templateAktif,
-            dataForm,
-            isiSurat,
-            kopSurat,
-            tandaTangan,
-            documentId,
-            sigMode,
-            pengaturan
-        };
+        const draft = { step, templateAktif, dataForm, isiSurat, kopSurat, tandaTangan, documentId, sigMode, pengaturan };
         localStorage.setItem('surat_draft_instan_futura', JSON.stringify(draft));
     }, [step, templateAktif, dataForm, isiSurat, kopSurat, tandaTangan, documentId, sigMode, pengaturan]);
 
-    // =================================================================
-    // SISTEM KEAMANAN (ROUTE GUARD)
-    // =================================================================
     useEffect(() => {
         const checkSecurityAndSession = async () => {
             const { data } = await supabase.auth.getSession();
@@ -109,10 +90,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
 
             setHasUsedFree(freeUsed);
             setIsPremium(premium);
-
-            if (freeUsed && !premium && step === 'form') {
-                // Jangan paksa ke beranda kalau dia lagi di tahap bayar
-            }
         };
 
         checkSecurityAndSession();
@@ -120,15 +97,12 @@ export default function TemplateInstan({ setHalamanAktif }) {
 
     useEffect(() => {
         if (editorRef.current && step === 'editor') {
-            if (editorRef.current.innerText !== isiSurat) {
-                editorRef.current.innerText = isiSurat;
+            if (editorRef.current.innerHTML !== isiSurat) {
+                editorRef.current.innerHTML = isiSurat;
             }
         }
     }, [isiSurat, step]);
 
-    // =================================================================
-    // LOGIKA "BUAT SURAT BARU"
-    // =================================================================
     const handleBuatBaru = () => {
         if (!isPremium && hasUsedFree) {
             setNotifPopup({
@@ -150,9 +124,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
         setPengaturan({ kertas: 'a4', fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt', spasi: '1.5' });
     };
 
-    // =================================================================
-    // KANVAS TTD RESPONSIF
-    // =================================================================
     const getCoordinates = (e) => {
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
@@ -160,10 +131,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
         const scaleY = canvas.height / rect.height;
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return {
-            x: (clientX - rect.left) * scaleX,
-            y: (clientY - rect.top) * scaleY
-        };
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
     };
 
     const startDrawing = (e) => {
@@ -224,9 +192,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
         return teksRaw.replace(/[*#`]/g, '');
     };
 
-    // =================================================================
-    // MESIN GENERATE INSTAN (MURNI TANPA AI)
-    // =================================================================
     const prosesGenerate = () => {
         if (!isPremium && hasUsedFree) {
             handleBuatBaru();
@@ -235,7 +200,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
 
         const templatePilihan = TEMPLATE_SURAT.find(t => t.id === templateAktif)?.templateStandar || "";
         let hasilInstan = templatePilihan;
-
         const formAktif = TEMPLATE_SURAT.find(t => t.id === templateAktif)?.fields || [];
 
         formAktif.forEach(field => {
@@ -244,7 +208,9 @@ export default function TemplateInstan({ setHalamanAktif }) {
             hasilInstan = hasilInstan.replace(regex, nilaiUser ? nilaiUser : `[${field.label}]`);
         });
 
-        setIsiSurat(bersihkanMarkdown(hasilInstan));
+        // Mengubah baris baru \n menjadi <br/> agar siap di-render oleh WYSIWYG
+        const htmlFormatted = bersihkanMarkdown(hasilInstan).replace(/\n/g, '<br/>');
+        setIsiSurat(htmlFormatted);
 
         setStep('editor');
         if (!isPremium) {
@@ -256,106 +222,82 @@ export default function TemplateInstan({ setHalamanAktif }) {
     const syncTextBeforeProcess = () => {
         const divIsi = document.getElementById('isi-surat-textarea');
         if (divIsi) {
-            let currentText = divIsi.innerText;
-            currentText = currentText.replace(/^\s+|\s+$/g, '');
+            let currentText = divIsi.innerHTML;
             setIsiSurat(currentText);
             return currentText;
         }
         return isiSurat;
     };
 
-    // =================================================================
-    // UNDUH PDF LANGSUNG (ANTI-SLICE & MARGIN 3CM ABSOLUT)
-    // 🔧 PATCH: html2canvas ditambah scrollX & windowWidth eksplisit
-    //    supaya tidak ikut menghitung area offset elemen offscreen,
-    //    yang sebelumnya bikin canvas raksasa & crash memori di Android.
-    // =================================================================
     const unduhPDF = async () => {
-        const teksTerbaru = syncTextBeforeProcess();
+        syncTextBeforeProcess();
+
         setIsDownloading(true);
         setNotifPopup({ title: "Mengunduh PDF...", message: "File sedang dibuat di server dan akan langsung terunduh otomatis ke perangkat Anda...", type: "warning" });
 
         const isF4 = pengaturan.kertas === 'f4';
         const ukuranKertas = isF4 ? '215.9mm 330.2mm' : '210mm 297mm';
 
-        // =============================================================
-        // 🔧 GANTI LIBRARY: dari html2pdf.js (client-side, rawan crash
-        // di Android karena parser CSS-nya tidak paham lab()/oklch())
-        // jadi Puppeteer + @sparticuz/chromium (server-side, gratis,
-        // pakai headless Chrome asli di server sendiri, tanpa API key).
-        // Semua fitur surat (kop surat, logo, TTD, pilihan
-        // kertas A4/F4, font, margin 30mm atas) tetap sama persis,
-        // cuma cara generate PDF-nya dipindah dari HP ke server.
-        // =============================================================
-        const htmlKopSurat = kopSurat.tampilkan ? `
-            <table style="width:100%;border-bottom:3px solid black;margin-bottom:30px;border-collapse:collapse;">
-                <tbody>
-                    <tr>
-                        <td style="width:15%;vertical-align:middle;padding:0 0 15px 0;">
-                            ${kopSurat.logoKiri ? `<img src="${kopSurat.logoKiri}" style="width:100%;max-height:85px;object-fit:contain;display:block;" />` : ''}
-                        </td>
-                        <td style="width:70%;text-align:center;vertical-align:middle;padding:0 15px 15px 15px;">
-                            <h1 style="font-size:18pt;font-weight:bold;text-transform:uppercase;margin:0 0 5px 0;font-family:${pengaturan.fontFamily};">${kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
-                            <p style="font-size:12pt;margin:0 0 5px 0;font-family:${pengaturan.fontFamily};">${kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
-                            <p style="font-size:10pt;margin:0;font-family:${pengaturan.fontFamily};">${kopSurat.kontakInstansi || 'Kontak: -'}</p>
-                        </td>
-                        <td style="width:15%;text-align:right;vertical-align:middle;padding:0 0 15px 0;">
-                            ${kopSurat.logoKanan ? `<img src="${kopSurat.logoKanan}" style="width:100%;max-height:85px;object-fit:contain;display:block;margin-left:auto;" />` : ''}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        ` : '';
+        const previewElement = document.getElementById('surat-paper-preview');
 
-        const htmlIsiSurat = teksTerbaru.split('\n').map((line) =>
-            `<p style="margin:0;min-height:1em;">${line.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
-        ).join('');
+        if (!previewElement) {
+            setIsDownloading(false);
+            setNotifPopup({ title: "Error", message: "Gagal menemukan area preview dokumen.", type: "error" });
+            return;
+        }
 
-        const htmlTtd = `
-            <div style="margin-top:40px;width:100%;overflow:hidden;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};">
-                <div style="float:right;width:250px;text-align:center;">
-                    <p style="margin:0 0 8px 0;">${dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
-                    <p style="margin:0 0 16px 0;">Hormat saya,</p>
-                    <div style="height:80px;margin:8px 0;display:flex;justify-content:center;align-items:center;">
-                        ${tandaTangan ? `<img src="${tandaTangan}" style="max-height:80px;max-width:100%;object-fit:contain;" />` : ''}
-                    </div>
-                    <p style="font-weight:bold;text-decoration:underline;margin:0;">${dataForm.nama || dataForm.nama1 || 'Nama Lengkap'}</p>
-                    ${(dataForm.posisi || dataForm.jabatan) ? `<p style="margin:0;">${dataForm.posisi || dataForm.jabatan}</p>` : ''}
-                </div>
-                <div style="clear:both;"></div>
-            </div>
-        `;
+        const clone = previewElement.cloneNode(true);
+        const styleNodes = document.querySelectorAll('style, link[rel="stylesheet"]');
+        let stylesHtml = '';
+        styleNodes.forEach(node => {
+            stylesHtml += node.outerHTML + '\n';
+        });
+
+        const baseUrl = window.location.origin;
 
         const htmlContent = `
             <!DOCTYPE html>
-            <html>
+            <html lang="id">
             <head>
                 <meta charset="utf-8" />
+                <base href="${baseUrl}" />
                 <style>
-                    @page { size: ${ukuranKertas}; margin: 30mm 25.4mm 25.4mm 25.4mm; }
-                    body { margin: 0; padding: 0; color: #000000; background: #ffffff; }
+                    * { box-sizing: border-box; }
+                    @page { size: ${ukuranKertas}; margin: 0; }
+                    body { 
+                        margin: 0; 
+                        padding: 0; 
+                        background: #ffffff; 
+                        color: #000000;
+                        -webkit-print-color-adjust: exact; 
+                        print-color-adjust: exact; 
+                        font-family: ${pengaturan.fontFamily.replace(/"/g, "'")};
+                    }
+                    #surat-paper-preview { 
+                        box-shadow: none !important; 
+                        border: none !important; 
+                        margin: 0 !important; 
+                        transform: none !important; 
+                        min-height: auto !important;
+                    }
                 </style>
+                ${stylesHtml}
             </head>
             <body>
-                <div style="width:100%;box-sizing:border-box;color:#000000;background:#ffffff;">
-                    ${htmlKopSurat}
-                    <div style="text-align:justify;font-family:${pengaturan.fontFamily};font-size:${pengaturan.fontSize};line-height:${pengaturan.spasi};white-space:pre-wrap;">
-                        ${htmlIsiSurat}
-                    </div>
-                    ${htmlTtd}
-                </div>
+                ${clone.outerHTML}
             </body>
             </html>
         `;
 
         try {
+            const filename = `Surat_${dataForm.nama || dataForm.nama1 || 'Instan'}.pdf`;
             const response = await fetch('/api/pdf', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    htmlContent,
-                    filename: `Surat_${dataForm.nama || dataForm.nama1 || 'Instan'}.pdf`,
-                }),
+                headers: {
+                    'Content-Type': 'text/html; charset=utf-8',
+                    'x-filename': filename
+                },
+                body: htmlContent,
             });
 
             if (!response.ok) {
@@ -367,7 +309,7 @@ export default function TemplateInstan({ setHalamanAktif }) {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Surat_${dataForm.nama || dataForm.nama1 || 'Instan'}.pdf`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -431,7 +373,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
     return (
         <div className="py-12 px-4 md:px-6 bg-slate-100 min-h-screen relative font-normal text-slate-800 overflow-hidden">
 
-            {/* POP-UP NOTIFIKASI UMUM */}
             {notifPopup && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4">
                     <div className="bg-white p-8 rounded-xl max-w-sm w-full text-center shadow-2xl animate-scale-in">
@@ -457,7 +398,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
                 </div>
             )}
 
-            {/* ANIMASI SUKSES UNDUH */}
             {showSuccessAnim && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
                     <div className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center animate-scale-in transform transition-all">
@@ -571,7 +511,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
                                     </div>
                                 )}
                             </div>
-
                         </div>
 
                         <div className="mt-12 flex justify-end">
@@ -596,7 +535,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
                             </div>
                         </div>
 
-                        {/* PANEL PENGATURAN KERTAS & FONT */}
                         <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-6 items-center">
                             <div className="flex flex-col">
                                 <label className="text-xs text-slate-500 block mb-1 font-bold">Ukuran Kertas</label>
@@ -633,21 +571,21 @@ export default function TemplateInstan({ setHalamanAktif }) {
                             </div>
                         </div>
 
-                        {/* TAMPILAN KERTAS UNTUK EDITOR DI LAYAR (MENGGUNAKAN DIV CONTENTEDITABLE) */}
                         <div className="w-full overflow-x-auto pb-12 flex md:justify-center bg-slate-200/50 p-2 md:p-6 rounded-xl border border-slate-300 shadow-inner">
-                            <div className="bg-white shadow-xl flex-shrink-0 relative transition-all duration-300" style={{ width: paperWidth, minHeight: paperHeight, padding: '25.4mm', boxSizing: 'border-box' }}>
+                            <div id="surat-paper-preview" className="bg-white shadow-xl flex-shrink-0 relative transition-all duration-300" style={{ width: paperWidth, minHeight: paperHeight, padding: '25.4mm', boxSizing: 'border-box', backgroundColor: 'white', color: 'black', fontFamily: pengaturan.fontFamily }}>
+
                                 {kopSurat.tampilkan && (
-                                    <div className="border-b-[3px] border-black pb-4 mb-8 flex items-center justify-between">
-                                        <div className="w-24 flex-shrink-0">
-                                            {kopSurat.logoKiri && <img src={kopSurat.logoKiri} alt="Logo Kiri" className="w-full h-auto object-contain max-h-24" />}
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '3px solid black', paddingBottom: '1rem', marginBottom: '2rem', width: '100%' }}>
+                                        <div style={{ width: '6rem', flexShrink: 0 }}>
+                                            {kopSurat.logoKiri && <img src={kopSurat.logoKiri} alt="Logo Kiri" style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: '6rem' }} />}
                                         </div>
-                                        <div className="flex-grow text-center px-4">
-                                            <h1 className="text-xl md:text-2xl font-bold uppercase tracking-wide text-black mb-1" style={{ fontFamily: pengaturan.fontFamily }}>{kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
-                                            <p className="text-xs md:text-sm text-black mb-1" style={{ fontFamily: pengaturan.fontFamily }}>{kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
-                                            <p className="text-[10px] md:text-xs text-black" style={{ fontFamily: pengaturan.fontFamily }}>{kopSurat.kontakInstansi || 'Kontak: -'}</p>
+                                        <div style={{ flexGrow: 1, textAlign: 'center', padding: '0 1rem' }}>
+                                            <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.025em', color: 'black', marginBottom: '4px', fontFamily: pengaturan.fontFamily }}>{kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
+                                            <p style={{ fontSize: '0.875rem', color: 'black', marginBottom: '4px', fontFamily: pengaturan.fontFamily }}>{kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
+                                            <p style={{ fontSize: '0.75rem', color: 'black', fontFamily: pengaturan.fontFamily }}>{kopSurat.kontakInstansi || 'Kontak: -'}</p>
                                         </div>
-                                        <div className="w-24 flex-shrink-0 text-right">
-                                            {kopSurat.logoKanan && <img src={kopSurat.logoKanan} alt="Logo Kanan" className="w-full h-auto object-contain max-h-24 ml-auto" />}
+                                        <div style={{ width: '6rem', flexShrink: 0, textAlign: 'right' }}>
+                                            {kopSurat.logoKanan && <img src={kopSurat.logoKanan} alt="Logo Kanan" style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: '6rem', marginLeft: 'auto' }} />}
                                         </div>
                                     </div>
                                 )}
@@ -657,30 +595,39 @@ export default function TemplateInstan({ setHalamanAktif }) {
                                     ref={editorRef}
                                     contentEditable={true}
                                     suppressContentEditableWarning={true}
-                                    onBlur={(e) => setIsiSurat(e.currentTarget.innerText)}
-                                    onInput={(e) => setIsiSurat(e.currentTarget.innerText)}
-                                    className="w-full outline-none text-black bg-transparent whitespace-pre-wrap break-words"
-                                    style={{ fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: pengaturan.spasi, textAlign: 'justify', minHeight: '150mm' }}
-                                >
-                                    {isiSurat}
-                                </div>
+                                    onBlur={(e) => setIsiSurat(e.currentTarget.innerHTML)}
+                                    style={{
+                                        width: '100%',
+                                        outline: 'none',
+                                        backgroundColor: 'transparent',
+                                        color: 'black',
+                                        fontFamily: pengaturan.fontFamily,
+                                        fontSize: pengaturan.fontSize,
+                                        lineHeight: pengaturan.spasi,
+                                        textAlign: 'justify',
+                                        minHeight: '150mm',
+                                        whiteSpace: 'pre-wrap',
+                                        wordWrap: 'break-word'
+                                    }}
+                                    dangerouslySetInnerHTML={{ __html: isiSurat }}
+                                />
 
-                                <div className="mt-12 flex justify-end" style={{ fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize }}>
-                                    <div className="text-center w-64 text-black">
-                                        <p className="mb-2">{dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
-                                        <p className="mb-4">Hormat saya,</p>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '3rem', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, width: '100%' }}>
+                                    <div style={{ textAlign: 'center', width: '16rem', color: 'black' }}>
+                                        <p style={{ marginBottom: '0.5rem' }}>{dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
+                                        <p style={{ marginBottom: '1rem' }}>Hormat saya,</p>
 
-                                        <div className="h-24 flex items-center justify-center my-2 relative">
+                                        <div style={{ height: '6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.5rem 0', position: 'relative' }}>
                                             {tandaTangan ? (
-                                                <img src={tandaTangan} alt="Tanda Tangan" className="max-h-full max-w-full object-contain" />
+                                                <img src={tandaTangan} alt="Tanda Tangan" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
                                             ) : (
-                                                <span className="text-slate-300 text-sm italic">(Area Tanda Tangan)</span>
+                                                <span style={{ color: '#cbd5e1', fontSize: '0.875rem', fontStyle: 'italic' }}>(Area Tanda Tangan)</span>
                                             )}
                                         </div>
 
-                                        <p className="font-bold underline">{dataForm.nama || dataForm.nama1 || 'Nama Lengkap / Instansi'}</p>
+                                        <p style={{ fontWeight: 'bold', textDecoration: 'underline', margin: 0 }}>{dataForm.nama || dataForm.nama1 || 'Nama Lengkap / Instansi'}</p>
                                         {(dataForm.posisi || dataForm.jabatan) && (
-                                            <p>{dataForm.posisi || dataForm.jabatan}</p>
+                                            <p style={{ margin: 0 }}>{dataForm.posisi || dataForm.jabatan}</p>
                                         )}
                                     </div>
                                 </div>
@@ -689,65 +636,6 @@ export default function TemplateInstan({ setHalamanAktif }) {
                     </div>
                 )}
             </div>
-
-            {/* =========================================================================================
-                🔥 BLUEPRINT RAHASIA (MENGGUNAKAN TABLE UNTUK FIX MARGIN 3CM SECARA ABSOLUT) 🔥
-                🔧 PATCH: posisi wrapper diubah dari "left: -9999px" (jauh di luar layar) menjadi
-                   "position: fixed, top/left: 0, opacity: 0" — tetap tidak kelihatan user,
-                   tapi html2canvas tidak lagi menghitung area offset raksasa saat cloning DOM,
-                   yang sebelumnya menyebabkan alokasi canvas terlalu besar & crash memori di Android.
-            ========================================================================================== */}
-            <div style={{ position: 'fixed', left: 0, top: 0, width: paperWidth, background: 'white', opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
-                <div id="pdf-blueprint" style={{ width: '100%', boxSizing: 'border-box', color: 'black', background: 'white', padding: '0mm 2mm 0mm 0mm' }}>
-
-                    {/* Pembungkus Kop Surat Menggunakan Table agar HTML2Canvas tidak menggeser margin top */}
-                    {kopSurat.tampilkan && (
-                        <table style={{ width: '100%', borderBottom: '3px solid black', marginBottom: '30px', borderCollapse: 'collapse' }}>
-                            <tbody>
-                                <tr>
-                                    <td style={{ width: '15%', verticalAlign: 'middle', padding: '0 0 15px 0' }}>
-                                        {kopSurat.logoKiri && <img src={kopSurat.logoKiri} alt="Logo" style={{ width: '100%', maxHeight: '85px', objectFit: 'contain', display: 'block' }} />}
-                                    </td>
-                                    <td style={{ width: '70%', textAlign: 'center', verticalAlign: 'middle', padding: '0 15px 15px 15px' }}>
-                                        <h1 style={{ fontSize: '18pt', fontWeight: 'bold', textTransform: 'uppercase', margin: '0 0 5px 0', fontFamily: pengaturan.fontFamily }}>{kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
-                                        <p style={{ fontSize: '12pt', margin: '0 0 5px 0', fontFamily: pengaturan.fontFamily }}>{kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
-                                        <p style={{ fontSize: '10pt', margin: 0, fontFamily: pengaturan.fontFamily }}>{kopSurat.kontakInstansi || 'Kontak: -'}</p>
-                                    </td>
-                                    <td style={{ width: '15%', textAlign: 'right', verticalAlign: 'middle', padding: '0 0 15px 0' }}>
-                                        {kopSurat.logoKanan && <img src={kopSurat.logoKanan} alt="Logo" style={{ width: '100%', maxHeight: '85px', objectFit: 'contain', display: 'block', marginLeft: 'auto' }} />}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    )}
-
-                    <div style={{ textAlign: 'justify', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, lineHeight: pengaturan.spasi }}>
-                        {isiSurat.split('\n').map((line, index) => (
-                            <p key={index} style={{ margin: '0', minHeight: '1em' }}>
-                                {line}
-                            </p>
-                        ))}
-                    </div>
-
-                    <div className="ttd-container" style={{ marginTop: '40px', width: '100%', overflow: 'hidden', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize }}>
-                        <div style={{ float: 'right', width: '250px', textAlign: 'center' }}>
-                            <p style={{ margin: '0 0 8px 0' }}>{dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
-                            <p style={{ margin: '0 0 16px 0' }}>Hormat saya,</p>
-
-                            <div style={{ height: '80px', margin: '8px 0', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                {tandaTangan && <img src={tandaTangan} alt="TTD" style={{ maxHeight: '80px', maxWidth: '100%', objectFit: 'contain' }} />}
-                            </div>
-
-                            <p style={{ fontWeight: 'bold', textDecoration: 'underline', margin: 0 }}>{dataForm.nama || dataForm.nama1 || 'Nama Lengkap'}</p>
-                            {(dataForm.posisi || dataForm.jabatan) && (
-                                <p style={{ margin: 0 }}>{dataForm.posisi || dataForm.jabatan}</p>
-                            )}
-                        </div>
-                        <div style={{ clear: 'both' }}></div>
-                    </div>
-                </div>
-            </div>
-
         </div>
     );
 }
