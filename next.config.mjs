@@ -13,31 +13,16 @@ const nextConfig = {
     '127.0.0.1',
   ],
 
+  // Kita amankan hal-hal basic saja, JANGAN pakai CSP default-src 'self' di Next.js 
+  // tanpa konfigurasi nonce yang rumit, karena akan mematikan fungsi React/tombol.
   async headers() {
     return [
       {
-        // Berlaku untuk semua route, termasuk /admin/*
         source: '/:path*',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' }, // Mencegah clickjacking
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload',
-          },
-        ],
-      },
-      {
-        // Khusus halaman admin: CSP lebih ketat lagi
-        source: '/admin/:path*',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value:
-              "default-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';",
-          },
         ],
       },
     ];
