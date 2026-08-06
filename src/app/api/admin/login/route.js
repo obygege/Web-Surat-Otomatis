@@ -3,35 +3,20 @@ import bcrypt from 'bcryptjs';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 import { signAdminToken } from '../../../../lib/adminAuth';
 
-// Menggunakan dummy hash bcrypt yang VALID agar sistem tidak crash
-// Ini adalah hash valid dari kata "dummy"
-const DUMMY_HASH = '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa';
-
-const MAX_ATTEMPTS = 5;       // maksimal percobaan gagal
-const WINDOW_MINUTES = 15;    // dalam rentang waktu ini (menit)
-const LOCK_MINUTES = 15;      // durasi terkunci setelah kena limit (menit)
-
-function getClientIp(req) {
-  const fwd = req.headers.get('x-forwarded-for');
-  if (fwd) return fwd.split(',')[0].trim();
-  return req.headers.get('x-real-ip') || 'unknown';
-}
-
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const { email: rawEmail, password } = body;
+    const { email, password } = await req.json();
 
-    if (!rawEmail || !password) {
+    if (!email || !password) {
       return NextResponse.json({ error: 'Email dan password wajib diisi.' }, { status: 400 });
     }
 
-    const email = String(rawEmail).trim().toLowerCase();
-    const ip = getClientIp(req);
-    const sejak = new Date(Date.now() - WINDOW_MINUTES * 60 * 1000).toISOString();
+    // 1. Ambil IP untuk identifikasi penyerang (Aman di Vercel)
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    const sejak = new Date(Date.now() - 15 * 60 * 1000).toISOString(); // Rentang 15 menit
 
-    // 1. Cek Rate Limiting untuk Anti Brute-force
-    const { count: gagalCount, error: errCount } = await supabaseAdmin
+    // 2. Cek apakah IP dan Email ini sudah gagal 5 kali dalam 15 menit terakhir
+    const { count: gagalCount } = await supabaseAdmin
       .from('admin_login_attempts')
       .select('*', { count: 'exact', head: true })
       .eq('email', email)
@@ -39,52 +24,40 @@ export async function POST(req) {
       .eq('success', false)
       .gte('created_at', sejak);
 
-    if (errCount) console.error('[DB Error] Gagal cek rate limit:', errCount);
-
-    if (!errCount && gagalCount >= MAX_ATTEMPTS) {
+    if (gagalCount >= 5) {
       return NextResponse.json(
-        { error: `Terlalu banyak percobaan gagal. Coba lagi dalam ${LOCK_MINUTES} menit.` },
+        { error: 'Terlalu banyak percobaan gagal. Silakan coba lagi dalam 15 menit.' },
         { status: 429 }
       );
     }
 
-    // 2. Ambil data admin berdasarkan email
-    const { data: adminList, error: adminError } = await supabaseAdmin
+    // 3. Proses Login Asli (seperti kode lu sebelumnya)
+    const { data: admin, error } = await supabaseAdmin
       .from('admin_users')
       .select('*')
-      .ilike('email', email);
+      .eq('email', email)
+      .single();
 
-    if (adminError) console.error('[DB Error] Gagal ambil data admin:', adminError);
-
-    const admin = adminList && adminList.length === 1 ? adminList[0] : null;
-
-    // 3. Verifikasi Password (Timing-safe)
-    const hashUntukDicek = admin?.password_hash || DUMMY_HASH;
-
-    let cocok = false;
-    try {
-      cocok = await bcrypt.compare(password, hashUntukDicek);
-    } catch (bcryptErr) {
-      // Jika masuk ke sini, berarti teks di kolom password_hash BUKAN format bcrypt yang valid
-      console.error('[Bcrypt Error] Format hash tidak valid di database:', bcryptErr.message);
-    }
-
-    const berhasil = !adminError && !!admin && cocok;
-
-    // 4. Catat percobaan log login secara asinkron dengan aman
-    await supabaseAdmin
-      .from('admin_login_attempts')
-      .insert([{ email, ip, success: berhasil }])
-      .catch((dbErr) => console.error('[DB Error] Gagal mencatat log attempt:', dbErr));
-
-    if (!berhasil) {
+    if (error || !admin) {
+      // Catat kegagalan ke database (wajib pakai await di Vercel)
+      await supabaseAdmin.from('admin_login_attempts').insert([{ email, ip, success: false }]);
       return NextResponse.json({ error: 'Email atau password salah.' }, { status: 401 });
     }
 
-    // 5. Sukses Login: Buat Token & set Cookie
-    const token = signAdminToken({ id: admin.id, email: admin.email, nama: admin.nama });
-    const response = NextResponse.json({ success: true, nama: admin.nama });
+    const cocok = await bcrypt.compare(password, admin.password_hash);
+    if (!cocok) {
+      // Catat kegagalan ke database
+      await supabaseAdmin.from('admin_login_attempts').insert([{ email, ip, success: false }]);
+      return NextResponse.json({ error: 'Email atau password salah.' }, { status: 401 });
+    }
 
+    // 4. Jika sukses, catat kesuksesannya agar log rapi
+    await supabaseAdmin.from('admin_login_attempts').insert([{ email, ip, success: true }]);
+
+    // 5. Buat Token & Cookie (dengan sameSite: 'strict' untuk anti-CSRF)
+    const token = signAdminToken({ id: admin.id, email: admin.email, nama: admin.nama });
+
+    const response = NextResponse.json({ success: true, nama: admin.nama });
     response.cookies.set('admin_session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -94,9 +67,8 @@ export async function POST(req) {
     });
 
     return response;
-
   } catch (err) {
-    console.error('[Server Error] Terjadi kesalahan saat admin login:', err);
+    console.error('Login Admin Error:', err);
     return NextResponse.json({ error: 'Terjadi kesalahan server.' }, { status: 500 });
   }
 }
