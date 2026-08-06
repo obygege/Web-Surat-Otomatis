@@ -47,11 +47,14 @@ export async function POST(req) {
     }
 
     // 2. Ambil data admin
-    const { data: admin, error } = await supabaseAdmin
+    // Pakai ilike (case-insensitive) supaya tidak terkunci gara-gara
+    // casing email di database beda dengan yang diketik user.
+    const { data: adminList, error } = await supabaseAdmin
       .from('admin_users')
       .select('*')
-      .eq('email', email)
-      .single();
+      .ilike('email', email);
+
+    const admin = adminList && adminList.length === 1 ? adminList[0] : null;
 
     // 3. Selalu jalankan bcrypt.compare (pakai dummy hash kalau admin tidak ada)
     //    supaya waktu respons sama antara "email salah" dan "password salah".
