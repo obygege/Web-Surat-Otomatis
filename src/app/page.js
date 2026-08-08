@@ -49,6 +49,17 @@ export default function Home() {
       if (user) {
         setUserAktif(user);
 
+        // PENTING: pastikan row 'profiles' ada untuk user ini.
+        // Signup manual (email/password) sudah insert profil saat daftar,
+        // tapi login Google (OAuth) TIDAK pernah insert row profiles sama sekali,
+        // jadi user Google jadi tidak pernah muncul di dashboard admin.
+        // upsert + ignoreDuplicates: kalau row sudah ada, JANGAN ditimpa
+        // (supaya status is_premium/premium_until yang sudah ada tidak reset).
+        await supabase.from('profiles').upsert(
+          { id: user.id, email: user.email },
+          { onConflict: 'id', ignoreDuplicates: true }
+        );
+
         // Tarik data profil pengguna dari database
         const { data: profile, error } = await supabase
           .from('profiles')

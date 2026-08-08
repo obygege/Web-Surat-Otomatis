@@ -28,6 +28,9 @@ export default function SuratEditor({ setHalamanAktif }) {
     // State Loading PDF
     const [isDownloading, setIsDownloading] = useState(false);
 
+    // State Preview Layar Penuh (fullscreen editing agar mudah menyejajarkan titik dua, geser TTD, dll)
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
     // Pengaturan Kertas, Font, dan Ukuran
     const [pengaturan, setPengaturan] = useState({
         kertas: 'a4',
@@ -211,6 +214,20 @@ export default function SuratEditor({ setHalamanAktif }) {
             setNotifPopup({ title: "Tersimpan", message: "Tanda tangan digital berhasil disimpan.", type: "success" });
         }
     };
+
+    useEffect(() => {
+        if (!isFullscreen) return;
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') setIsFullscreen(false);
+        };
+        window.addEventListener('keydown', handleEsc);
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            window.removeEventListener('keydown', handleEsc);
+            document.body.style.overflow = prevOverflow;
+        };
+    }, [isFullscreen]);
 
     const handleFormChange = (e) => setDataForm({ ...dataForm, [e.target.name]: e.target.value });
     const handleKopChange = (e) => setKopSurat({ ...kopSurat, [e.target.name]: e.target.value });
@@ -664,6 +681,10 @@ ATURAN MUTLAK:
                             <h3 className="text-xl font-bold text-slate-800">Review Dokumen <span className="text-blue-500">(Versi AI)</span></h3>
                             <div className="flex gap-3">
                                 <button disabled={isDownloading} onClick={() => setStep('form')} className="px-5 py-2.5 border border-slate-300 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition disabled:opacity-50">Edit Form</button>
+                                <button disabled={isDownloading} onClick={() => setIsFullscreen(true)} className="px-5 py-2.5 border border-slate-300 text-slate-600 font-medium rounded-lg hover:bg-slate-50 transition disabled:opacity-50 flex items-center gap-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                                    Layar Penuh
+                                </button>
                                 <button disabled={isDownloading} onClick={unduhPDF} className="px-6 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md transition flex items-center gap-2 disabled:opacity-50">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
                                     {isDownloading ? 'Memproses...' : 'Unduh PDF Asli'}
@@ -671,103 +692,123 @@ ATURAN MUTLAK:
                             </div>
                         </div>
 
-                        <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-6 items-center">
-                            <div className="flex flex-col">
-                                <label className="text-xs text-slate-500 block mb-1 font-bold">Ukuran Kertas</label>
-                                <select value={pengaturan.kertas} onChange={e => setPengaturan({ ...pengaturan, kertas: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
-                                    <option value="a4">A4 (21 x 29.7 cm)</option>
-                                    <option value="f4">F4 / Folio (21.5 x 33 cm)</option>
-                                </select>
-                            </div>
-                            <div className="flex flex-col">
-                                <label className="text-xs text-slate-500 block mb-1 font-bold">Jenis Font</label>
-                                <select value={pengaturan.fontFamily} onChange={e => setPengaturan({ ...pengaturan, fontFamily: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
-                                    <option value='"Times New Roman", Times, serif'>Times New Roman</option>
-                                    <option value='Arial, Helvetica, sans-serif'>Arial</option>
-                                    <option value='"Courier New", Courier, monospace'>Courier New</option>
-                                </select>
-                            </div>
-                            <div className="flex flex-col">
-                                <label className="text-xs text-slate-500 block mb-1 font-bold">Ukuran Font</label>
-                                <select value={pengaturan.fontSize} onChange={e => setPengaturan({ ...pengaturan, fontSize: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
-                                    <option value="10pt">10 pt</option>
-                                    <option value="11pt">11 pt</option>
-                                    <option value="12pt">12 pt (Standar)</option>
-                                    <option value="14pt">14 pt</option>
-                                </select>
-                            </div>
-                            <div className="flex flex-col">
-                                <label className="text-xs text-slate-500 block mb-1 font-bold">Spasi Baris</label>
-                                <select value={pengaturan.spasi} onChange={e => setPengaturan({ ...pengaturan, spasi: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
-                                    <option value="1">1.0 (Rapat)</option>
-                                    <option value="1.15">1.15</option>
-                                    <option value="1.5">1.5 (Standar)</option>
-                                    <option value="2">2.0 (Renggang)</option>
-                                </select>
-                            </div>
-                        </div>
+                        <div className={isFullscreen ? "fixed inset-0 z-[100] bg-slate-900/95 overflow-y-auto p-3 md:p-8" : ""}>
 
-                        <div className="w-full overflow-x-auto pb-12 flex md:justify-center bg-slate-200/50 p-2 md:p-6 rounded-xl border border-slate-300 shadow-inner">
-                            <div id="surat-paper-preview" className="bg-white shadow-xl flex-shrink-0 relative transition-all duration-300" style={{ width: paperWidth, minHeight: paperHeight, padding: '25.4mm', boxSizing: 'border-box', backgroundColor: 'white', color: 'black', fontFamily: pengaturan.fontFamily }}>
-
-                                {kopSurat.tampilkan && (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '3px solid black', paddingBottom: '1rem', marginBottom: '2rem', width: '100%' }}>
-                                        <div style={{ width: '6rem', flexShrink: 0 }}>
-                                            {kopSurat.logoKiri && <img src={kopSurat.logoKiri} alt="Logo Kiri" style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: '6rem' }} />}
-                                        </div>
-                                        <div style={{ flexGrow: 1, textAlign: 'center', padding: '0 1rem' }}>
-                                            <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.025em', color: 'black', marginBottom: '4px', fontFamily: pengaturan.fontFamily }}>{kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
-                                            <p style={{ fontSize: '0.875rem', color: 'black', marginBottom: '4px', fontFamily: pengaturan.fontFamily }}>{kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
-                                            <p style={{ fontSize: '0.75rem', color: 'black', fontFamily: pengaturan.fontFamily }}>{kopSurat.kontakInstansi || 'Kontak: -'}</p>
-                                        </div>
-                                        <div style={{ width: '6rem', flexShrink: 0, textAlign: 'right' }}>
-                                            {kopSurat.logoKanan && <img src={kopSurat.logoKanan} alt="Logo Kanan" style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: '6rem', marginLeft: 'auto' }} />}
-                                        </div>
+                            {isFullscreen && (
+                                <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur -mx-3 md:-mx-8 px-3 md:px-8 pt-1 pb-4 mb-4 flex flex-wrap justify-between items-center gap-3">
+                                    <h3 className="text-lg font-bold text-white">Mode Layar Penuh <span className="text-blue-400">(Edit Bebas)</span></h3>
+                                    <div className="flex gap-3">
+                                        <button disabled={isDownloading} onClick={unduhPDF} className="px-5 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md transition flex items-center gap-2 disabled:opacity-50">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                                            {isDownloading ? 'Memproses...' : 'Unduh PDF Asli'}
+                                        </button>
+                                        <button onClick={() => setIsFullscreen(false)} className="px-5 py-2.5 bg-white text-slate-700 font-bold rounded-lg hover:bg-slate-100 shadow-md transition flex items-center gap-2">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                            Keluar (Esc)
+                                        </button>
                                     </div>
-                                )}
+                                </div>
+                            )}
 
-                                <div
-                                    id="isi-surat-textarea"
-                                    ref={editorRef}
-                                    contentEditable={true}
-                                    suppressContentEditableWarning={true}
-                                    onBlur={(e) => setIsiSurat(e.currentTarget.innerHTML)}
-                                    style={{
-                                        width: '100%',
-                                        outline: 'none',
-                                        backgroundColor: 'transparent',
-                                        color: 'black',
-                                        fontFamily: pengaturan.fontFamily,
-                                        fontSize: pengaturan.fontSize,
-                                        lineHeight: pengaturan.spasi,
-                                        textAlign: 'justify',
-                                        minHeight: '150mm',
-                                        whiteSpace: 'pre-wrap',
-                                        wordWrap: 'break-word'
-                                    }}
-                                    dangerouslySetInnerHTML={{ __html: isiSurat }}
-                                />
+                            <div className={isFullscreen ? "bg-white/90 p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-6 items-center" : "bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-6 items-center"}>
+                                <div className="flex flex-col">
+                                    <label className="text-xs text-slate-500 block mb-1 font-bold">Ukuran Kertas</label>
+                                    <select value={pengaturan.kertas} onChange={e => setPengaturan({ ...pengaturan, kertas: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                                        <option value="a4">A4 (21 x 29.7 cm)</option>
+                                        <option value="f4">F4 / Folio (21.5 x 33 cm)</option>
+                                    </select>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="text-xs text-slate-500 block mb-1 font-bold">Jenis Font</label>
+                                    <select value={pengaturan.fontFamily} onChange={e => setPengaturan({ ...pengaturan, fontFamily: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                                        <option value='"Times New Roman", Times, serif'>Times New Roman</option>
+                                        <option value='Arial, Helvetica, sans-serif'>Arial</option>
+                                        <option value='"Courier New", Courier, monospace'>Courier New</option>
+                                    </select>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="text-xs text-slate-500 block mb-1 font-bold">Ukuran Font</label>
+                                    <select value={pengaturan.fontSize} onChange={e => setPengaturan({ ...pengaturan, fontSize: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                                        <option value="10pt">10 pt</option>
+                                        <option value="11pt">11 pt</option>
+                                        <option value="12pt">12 pt (Standar)</option>
+                                        <option value="14pt">14 pt</option>
+                                    </select>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="text-xs text-slate-500 block mb-1 font-bold">Spasi Baris</label>
+                                    <select value={pengaturan.spasi} onChange={e => setPengaturan({ ...pengaturan, spasi: e.target.value })} className="bg-slate-50 border border-slate-300 rounded-md px-3 py-2 text-sm outline-none focus:border-blue-500 transition">
+                                        <option value="1">1.0 (Rapat)</option>
+                                        <option value="1.15">1.15</option>
+                                        <option value="1.5">1.5 (Standar)</option>
+                                        <option value="2">2.0 (Renggang)</option>
+                                    </select>
+                                </div>
+                            </div>
 
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '3rem', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, width: '100%' }}>
-                                    <div style={{ textAlign: 'center', width: '16rem', color: 'black' }}>
-                                        <p style={{ marginBottom: '0.5rem' }}>{dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
-                                        <p style={{ marginBottom: '1rem' }}>Hormat saya,</p>
+                            <div className={isFullscreen ? "w-full overflow-x-auto pb-16 flex md:justify-center bg-transparent p-2 md:p-6" : "w-full overflow-x-auto pb-12 flex md:justify-center bg-slate-200/50 p-2 md:p-6 rounded-xl border border-slate-300 shadow-inner"}>
+                                <div id="surat-paper-preview" className="bg-white shadow-xl flex-shrink-0 relative transition-all duration-300" style={{ width: paperWidth, minHeight: paperHeight, padding: '25.4mm', boxSizing: 'border-box', backgroundColor: 'white', color: 'black', fontFamily: pengaturan.fontFamily }}>
 
-                                        <div style={{ height: '6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.5rem 0', position: 'relative' }}>
-                                            {tandaTangan ? (
-                                                <img src={tandaTangan} alt="Tanda Tangan" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
-                                            ) : (
-                                                <span style={{ color: '#cbd5e1', fontSize: '0.875rem', fontStyle: 'italic' }}>(Area Tanda Tangan)</span>
+                                    {kopSurat.tampilkan && (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '3px solid black', paddingBottom: '1rem', marginBottom: '2rem', width: '100%' }}>
+                                            <div style={{ width: '6rem', flexShrink: 0 }}>
+                                                {kopSurat.logoKiri && <img src={kopSurat.logoKiri} alt="Logo Kiri" style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: '6rem' }} />}
+                                            </div>
+                                            <div style={{ flexGrow: 1, textAlign: 'center', padding: '0 1rem' }}>
+                                                <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.025em', color: 'black', marginBottom: '4px', fontFamily: pengaturan.fontFamily }}>{kopSurat.namaInstansi || 'NAMA INSTANSI'}</h1>
+                                                <p style={{ fontSize: '0.875rem', color: 'black', marginBottom: '4px', fontFamily: pengaturan.fontFamily }}>{kopSurat.alamatInstansi || 'Alamat Instansi Lengkap'}</p>
+                                                <p style={{ fontSize: '0.75rem', color: 'black', fontFamily: pengaturan.fontFamily }}>{kopSurat.kontakInstansi || 'Kontak: -'}</p>
+                                            </div>
+                                            <div style={{ width: '6rem', flexShrink: 0, textAlign: 'right' }}>
+                                                {kopSurat.logoKanan && <img src={kopSurat.logoKanan} alt="Logo Kanan" style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: '6rem', marginLeft: 'auto' }} />}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div
+                                        id="isi-surat-textarea"
+                                        ref={editorRef}
+                                        contentEditable={true}
+                                        suppressContentEditableWarning={true}
+                                        onBlur={(e) => setIsiSurat(e.currentTarget.innerHTML)}
+                                        style={{
+                                            width: '100%',
+                                            outline: 'none',
+                                            backgroundColor: 'transparent',
+                                            color: 'black',
+                                            fontFamily: pengaturan.fontFamily,
+                                            fontSize: pengaturan.fontSize,
+                                            lineHeight: pengaturan.spasi,
+                                            textAlign: 'justify',
+                                            minHeight: '150mm',
+                                            whiteSpace: 'pre-wrap',
+                                            wordWrap: 'break-word'
+                                        }}
+                                        dangerouslySetInnerHTML={{ __html: isiSurat }}
+                                    />
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '3rem', fontFamily: pengaturan.fontFamily, fontSize: pengaturan.fontSize, width: '100%' }}>
+                                        <div style={{ textAlign: 'center', width: '16rem', color: 'black' }}>
+                                            <p style={{ marginBottom: '0.5rem' }}>{dataForm.tempatTanggal || 'Tempat, Tanggal'}</p>
+                                            <p style={{ marginBottom: '1rem' }}>Hormat saya,</p>
+
+                                            <div style={{ height: '6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.5rem 0', position: 'relative' }}>
+                                                {tandaTangan ? (
+                                                    <img src={tandaTangan} alt="Tanda Tangan" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
+                                                ) : (
+                                                    <span style={{ color: '#cbd5e1', fontSize: '0.875rem', fontStyle: 'italic' }}>(Area Tanda Tangan)</span>
+                                                )}
+                                            </div>
+
+                                            <p style={{ fontWeight: 'bold', textDecoration: 'underline', margin: 0 }}>{dataForm.nama || dataForm.nama1 || 'Nama Lengkap / Instansi'}</p>
+                                            {(dataForm.posisi || dataForm.jabatan) && (
+                                                <p style={{ margin: 0 }}>{dataForm.posisi || dataForm.jabatan}</p>
                                             )}
                                         </div>
-
-                                        <p style={{ fontWeight: 'bold', textDecoration: 'underline', margin: 0 }}>{dataForm.nama || dataForm.nama1 || 'Nama Lengkap / Instansi'}</p>
-                                        {(dataForm.posisi || dataForm.jabatan) && (
-                                            <p style={{ margin: 0 }}>{dataForm.posisi || dataForm.jabatan}</p>
-                                        )}
                                     </div>
                                 </div>
                             </div>
+
                         </div>
                     </div>
                 )}

@@ -5,21 +5,21 @@
 // =====================================================================
 
 export const fieldPekerjaanPribadi = [
-    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Sekayu, 16 Juni 2026' },
-    { name: 'tujuan', label: 'Tujuan Surat (Yth)', placeholder: 'HRD PT PLN (Persero)' },
-    { name: 'nama', label: 'Nama Lengkap', placeholder: 'Roby Akshay' },
+    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Jakarta, 16 Juni 2026' },
+    { name: 'tujuan', label: 'Tujuan Surat (Yth)', placeholder: 'HRD PT Sumber Makmur' },
+    { name: 'nama', label: 'Nama Lengkap', placeholder: 'Andi Wijaya' },
     { name: 'ttl', label: 'Tempat, Tanggal Lahir', placeholder: 'Palembang, 10 Agustus 2000' },
     { name: 'pendidikan', label: 'Pendidikan Terakhir', placeholder: 'S1 Sistem Informasi' },
     { name: 'noHp', label: 'No. Handphone/WA', placeholder: '081234567890' },
-    { name: 'email', label: 'Alamat Email', placeholder: 'roby@futuralink.com' },
+    { name: 'email', label: 'Alamat Email', placeholder: 'andi.wijaya@contohemail.com' },
     { name: 'posisi', label: 'Posisi / Jabatan', placeholder: 'Frontliner / Fullstack Developer' },
     { name: 'poin', label: 'Alasan Khusus / Kompetensi', placeholder: 'Menguasai Next.js, Flutter, dan Laravel...' }
 ];
 
 export const fieldPekerjaanInternal = [
-    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Sekayu, 16 Juni 2026' },
+    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Jakarta, 16 Juni 2026' },
     { name: 'tujuan', label: 'Atasan / HRD (Yth)', placeholder: 'Bapak Manajer Operasional' },
-    { name: 'nama', label: 'Nama Lengkap', placeholder: 'Roby Akshay' },
+    { name: 'nama', label: 'Nama Lengkap', placeholder: 'Andi Wijaya' },
     { name: 'nik', label: 'NIK / NIP Karyawan', placeholder: '19902026XXXXXXXX' },
     { name: 'posisi', label: 'Jabatan Saat Ini', placeholder: 'Staff IT Support' },
     { name: 'poin', label: 'Alasan / Tanggal Izin/Cuti', placeholder: 'Sakit demam / Terhitung mulai tanggal 20-22 Juni...' }
@@ -27,28 +27,28 @@ export const fieldPekerjaanInternal = [
 
 export const fieldHRD = [
     { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Palembang, 16 Juni 2026' },
-    { name: 'nama', label: 'Nama Pimpinan / HRD', placeholder: 'Roby Akshay' },
+    { name: 'nama', label: 'Nama Pimpinan / HRD', placeholder: 'Andi Wijaya' },
     { name: 'jabatan', label: 'Jabatan Pimpinan', placeholder: 'HR Manager Futura Link' },
     { name: 'tujuan', label: 'Nama Karyawan Tujuan', placeholder: 'Budi Santoso' },
     { name: 'nikKaryawan', label: 'NIK Karyawan Tujuan', placeholder: '2025001' },
     { name: 'posisiKaryawan', label: 'Posisi Karyawan Tujuan', placeholder: 'Staff Administrasi' },
-    { name: 'poin', label: 'Keterangan / Alasan / Mutasi', placeholder: 'Dipindahtugaskan ke cabang Musi Banyuasin...' }
+    { name: 'poin', label: 'Keterangan / Alasan / Mutasi', placeholder: 'Dipindahtugaskan ke cabang Kabupaten Makmur Jaya...' }
 ];
 
 export const fieldAkademikPribadi = [
-    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Lumpatan, 16 Juni 2026' },
+    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Bogor, 16 Juni 2026' },
     { name: 'tujuan', label: 'Tujuan Surat (Dosen/Kepsek/Dekan)', placeholder: 'Ketua Program Studi Teknik Informatika' },
-    { name: 'nama', label: 'Nama Siswa / Mahasiswa', placeholder: 'Roby Akshay' },
+    { name: 'nama', label: 'Nama Siswa / Mahasiswa', placeholder: 'Andi Wijaya' },
     { name: 'nim_nis', label: 'NIM / NIS', placeholder: '09021181XXXXXXXX' },
     { name: 'instansi', label: 'Nama Sekolah / Kampus', placeholder: 'Universitas Sriwijaya' },
     { name: 'poin', label: 'Keperluan / Judul Skripsi / Alasan', placeholder: 'Riset skripsi Kualitas Pelayanan Administrasi Desa...' }
 ];
 
 export const fieldAkademikInstansi = [
-    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Sekayu, 16 Juni 2026' },
+    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Jakarta, 16 Juni 2026' },
     { name: 'nama', label: 'Nama Pimpinan Instansi', placeholder: 'Dr. Budi Darmawan' },
     { name: 'instansi', label: 'Nama Sekolah / Kampus', placeholder: 'Universitas Sriwijaya' },
-    { name: 'tujuan', label: 'Nama Siswa / Mahasiswa', placeholder: 'Roby Akshay' },
+    { name: 'tujuan', label: 'Nama Siswa / Mahasiswa', placeholder: 'Andi Wijaya' },
     { name: 'nim_nis', label: 'NIM / NIS', placeholder: '09021181XXXXXXXX' },
     { name: 'poin', label: 'Keterangan Kelulusan / Panggilan', placeholder: 'Dinyatakan Lulus dengan predikat Cumlaude...' }
 ];
@@ -57,35 +57,35 @@ export const fieldBisnis = [
     { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Palembang, 16 Juni 2026' },
     { name: 'tujuan', label: 'Nama Klien / Tujuan', placeholder: 'Direktur PT Karya Sentosa' },
     { name: 'instansiTujuan', label: 'Perusahaan Tujuan', placeholder: 'PT Karya Sentosa' },
-    { name: 'nama', label: 'Nama Anda / Pimpinan', placeholder: 'Roby Akshay' },
+    { name: 'nama', label: 'Nama Anda / Pimpinan', placeholder: 'Andi Wijaya' },
     { name: 'jabatan', label: 'Jabatan Anda', placeholder: 'CEO Futura Link' },
     { name: 'namaPerusahaan', label: 'Perusahaan Anda', placeholder: 'Futura Link' },
     { name: 'poin', label: 'Deskripsi Penawaran/Invoice/Komplain', placeholder: 'Penawaran pembuatan sistem Point of Sales (isaji)...' }
 ];
 
 export const fieldDesa = [
-    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Lumpatan, 16 Juni 2026' },
-    { name: 'nama', label: 'Nama Pemohon / Warga', placeholder: 'Roby Akshay' },
+    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Bogor, 16 Juni 2026' },
+    { name: 'nama', label: 'Nama Pemohon / Warga', placeholder: 'Andi Wijaya' },
     { name: 'nik', label: 'NIK / No. KTP', placeholder: '16060XXXXXXXXXXX' },
-    { name: 'ttl', label: 'Tempat, Tanggal Lahir', placeholder: 'Sekayu, 10 Agustus 2000' },
+    { name: 'ttl', label: 'Tempat, Tanggal Lahir', placeholder: 'Bandung, 10 Agustus 2000' },
     { name: 'pekerjaan', label: 'Pekerjaan', placeholder: 'Wiraswasta' },
-    { name: 'alamatLengkap', label: 'Alamat Lengkap', placeholder: 'Dusun II, Desa Lumpatan Raya...' },
+    { name: 'alamatLengkap', label: 'Alamat Lengkap', placeholder: 'Dusun II, Desa Sukamaju...' },
     { name: 'poin', label: 'Keterangan Khusus / Keperluan', placeholder: 'Persyaratan pengajuan KUR Bank...' }
 ];
 
 export const fieldPernyataan = [
-    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Sekayu, 16 Juni 2026' },
-    { name: 'nama', label: 'Nama Lengkap', placeholder: 'Roby Akshay' },
+    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Jakarta, 16 Juni 2026' },
+    { name: 'nama', label: 'Nama Lengkap', placeholder: 'Andi Wijaya' },
     { name: 'nik', label: 'NIK / No. KTP', placeholder: '16060XXXXXXXXXXX' },
-    { name: 'alamatLengkap', label: 'Alamat Lengkap', placeholder: 'Jl. Merdeka, Sekayu...' },
+    { name: 'alamatLengkap', label: 'Alamat Lengkap', placeholder: 'Jl. Merdeka, Bandung...' },
     { name: 'poin', label: 'Isi Pernyataan / Kesanggupan', placeholder: 'Menyatakan sanggup ditempatkan di seluruh wilayah kerja...' }
 ];
 
 export const fieldPerjanjian = [
     { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Palembang, 16 Juni 2026' },
-    { name: 'nama1', label: 'Nama Pihak Pertama', placeholder: 'Roby Akshay' },
+    { name: 'nama1', label: 'Nama Pihak Pertama', placeholder: 'Andi Wijaya' },
     { name: 'nik1', label: 'NIK Pihak Pertama', placeholder: '16060XXXXXXXXXXX' },
-    { name: 'alamat1', label: 'Alamat Pihak Pertama', placeholder: 'Lumpatan, Musi Banyuasin' },
+    { name: 'alamat1', label: 'Alamat Pihak Pertama', placeholder: 'Sukamaju, Kabupaten Makmur Jaya' },
     { name: 'nama2', label: 'Nama Pihak Kedua', placeholder: 'Ahmad Budi' },
     { name: 'nik2', label: 'NIK Pihak Kedua', placeholder: '16060YYYYYYYYYYY' },
     { name: 'alamat2', label: 'Alamat Pihak Kedua', placeholder: 'Ilir Barat, Palembang' },
@@ -94,17 +94,17 @@ export const fieldPerjanjian = [
 
 export const fieldKuasa = [
     { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Palembang, 16 Juni 2026' },
-    { name: 'nama', label: 'Nama Pemberi Kuasa', placeholder: 'Roby Akshay' },
+    { name: 'nama', label: 'Nama Pemberi Kuasa', placeholder: 'Andi Wijaya' },
     { name: 'nik', label: 'NIK Pemberi Kuasa', placeholder: '16060XXXXXXXXXXX' },
-    { name: 'alamatLengkap', label: 'Alamat Pemberi Kuasa', placeholder: 'Musi Banyuasin' },
+    { name: 'alamatLengkap', label: 'Alamat Pemberi Kuasa', placeholder: 'Kabupaten Makmur Jaya' },
     { name: 'penerimaKuasa', label: 'Nama Penerima Kuasa', placeholder: 'Andi Pratama' },
     { name: 'nikPenerima', label: 'NIK Penerima Kuasa', placeholder: '16060ZZZZZZZZZZZ' },
     { name: 'poin', label: 'Wewenang yang Dikuasakan', placeholder: 'Mengambil BPKB kendaraan dengan Nopol...' }
 ];
 
 export const fieldOrganisasi = [
-    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Sekayu, 16 Juni 2026' },
-    { name: 'tujuan', label: 'Penerima Surat (Yth)', placeholder: 'Bapak/Ibu Kepala Desa Lumpatan' },
+    { name: 'tempatTanggal', label: 'Tempat & Tanggal', placeholder: 'Jakarta, 16 Juni 2026' },
+    { name: 'tujuan', label: 'Penerima Surat (Yth)', placeholder: 'Bapak/Ibu Kepala Desa Sukamaju' },
     { name: 'nama', label: 'Nama Organisasi / Panitia', placeholder: 'Panitia Riset Mahasiswa' },
     { name: 'kegiatan', label: 'Nama Kegiatan / Acara', placeholder: 'Penelitian Kualitas Pelayanan Administrasi' },
     { name: 'tanggalKegiatan', label: 'Hari/Tanggal Kegiatan', placeholder: 'Senin, 20 Juni 2026' },
