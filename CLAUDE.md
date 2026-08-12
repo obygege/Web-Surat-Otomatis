@@ -1,5 +1,5 @@
 export const metadata = {
-  metadataBase: new URL("https://futuradocs.id"),
+  metadataBase: new URL("https://suratotomatis.com"),
 
   title: {
     default: "Futura Docs",
@@ -26,7 +26,12 @@ export const metadata = {
     "Surat Resmi",
     "Surat Otomatis",
     "AI Indonesia",
-    "Futura Docs"
+    "Futura Docs",
+    "Pembuat Surat Otomatis",
+    "Cara Buat Surat",
+    "Contoh Surat Lamaran Pekerjaan",
+    "Template Surat Resmi",
+    "Surat Lamaran Terbaru"
   ],
 
   authors: [
@@ -56,7 +61,7 @@ export const metadata = {
     title: "Futura Docs",
     description:
       "Platform AI Pembuat Surat Resmi Indonesia.",
-    url: "https://futuradocs.id",
+    url: "https://suratotomatis.com",
     siteName: "Futura Docs",
     locale: "id_ID",
     type: "website",
@@ -74,7 +79,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "Futura Docs",
     description:
-      "Platform AI Pembuat Surat Resmi Indonesia.",
+      "Platform Pembuat Surat Resmi Secara Otomatis di Indonesia.",
     images: ["/seo-banner.png"],
   },
 

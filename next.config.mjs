@@ -11,6 +11,7 @@ const nextConfig = {
     '192.168.1.7',
     'localhost',
     '127.0.0.1',
+    'suratotomatis.com',
   ],
 
   // Kita amankan hal-hal basic saja, JANGAN pakai CSP default-src 'self' di Next.js 
